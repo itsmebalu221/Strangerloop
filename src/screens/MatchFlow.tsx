@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { SEARCH_STAGES, interestById } from "../data";
 import { pickStranger, queueCandidates, searchDuration } from "../engine";
+import { LIVE_ENABLED } from "../config";
+import { getLiveSocket, liveSocket } from "../live";
 import { useStore } from "../store";
-import type { MatchResult } from "../types";
-import { Avatar, Icon, Squiggle } from "../components/ui";
+import type { LiveMatch, MatchResult } from "../types";
+import { Avatar, Icon } from "../components/ui";
 
 /* ================= SEARCHING ================= */
 export function Searching() {
-  const { profile, prefs, blocked, setFlow, bumpStats } = useStore();
+  const { profile, prefs, blocked, setFlow, bumpStats, toast } = useStore();
   const [stageIdx, setStageIdx] = useState(0);
   const startedRef = useRef(false);
 
@@ -26,6 +28,37 @@ export function Searching() {
       setStageIdx((i) => Math.min(i + 1, SEARCH_STAGES.length - 1));
     }, 950);
 
+    /* live mode — join the server queue; a real match arrives over the socket */
+    if (LIVE_ENABLED) {
+      let cancelled = false;
+      void getLiveSocket().then((s) => {
+        if (cancelled) return;
+        const onFound = (m: LiveMatch) => {
+          if (!cancelled) setFlow({ stage: "chat", live: m });
+        };
+        const onError = (e: { message?: string }) => {
+          if (!cancelled) {
+            toast(e.message ?? "Couldn't join the matching queue.", "warn");
+            setFlow({ stage: "idle" });
+          }
+        };
+        s.on("match:found", onFound);
+        s.on("queue:error", onError);
+        s.emit("queue:join", { prefs });
+      });
+      return () => {
+        cancelled = true;
+        window.clearInterval(stageTimer);
+        const s = liveSocket();
+        if (s) {
+          s.off("match:found");
+          s.off("queue:error");
+          s.emit("queue:leave");
+        }
+      };
+    }
+
+    /* simulation mode */
     const matchTimer = window.setTimeout(() => {
       const match = pickStranger(profile, prefs, blocked.map((b) => b.personaId));
       setFlow({ stage: "intro", match });
@@ -44,15 +77,14 @@ export function Searching() {
       <div className="relative h-full max-w-3xl mx-auto px-5 flex flex-col items-center justify-center text-center">
         {/* radar */}
         <div className="relative w-[300px] h-[300px] sm:w-[380px] sm:h-[380px] mb-10">
-          {[1, 0.72, 0.44].map((s, i) => (
-            <span key={s} className="absolute rounded-full border-2 border-ink/12 animate-ring" style={{ inset: `${(1 - s) * 50}%`, animationDelay: `${i * 0.7}s` }} />
+          {[1, 0.72, 0.44].map((s) => (
+            <span key={s} className="absolute rounded-full border-2 border-ink/10" style={{ inset: `${(1 - s) * 50}%` }} />
           ))}
           <span className="absolute inset-0 rounded-full border-2 border-ink/15" />
           <span className="absolute inset-[14%] rounded-full border border-ink/10" />
           <span className="absolute inset-[28%] rounded-full border border-ink/10" />
           {/* sweep */}
-          <span className="absolute inset-0 rounded-full animate-sweep" style={{ background: "conic-gradient(from 0deg, rgba(255,75,46,0.28), transparent 70deg)" }} />
-          <span className="absolute inset-0 rounded-full animate-sweep" style={{ background: "conic-gradient(from 0deg, rgba(47,191,143,0.2), transparent 60deg)", animationDuration: "5s" }} />
+          <span className="absolute inset-0 rounded-full animate-sweep" style={{ background: "conic-gradient(from 0deg, rgba(255,75,46,0.22), transparent 65deg)" }} />
           {/* center you */}
           <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 rounded-full bg-coral border-2 border-ink shadow-hard-sm inline-flex items-center justify-center text-paper">
             <Icon name="radar" className="w-7 h-7" />
@@ -78,7 +110,7 @@ export function Searching() {
         <p className="display text-[clamp(2rem,5vw,3.4rem)] leading-none mb-4">
           Finding someone<span className="animate-caret text-coral">…</span>
         </p>
-        <p key={stageIdx} className="mono-label text-fern animate-ticker">{SEARCH_STAGES[stageIdx]}</p>
+        <p key={stageIdx} className="mono-label text-fern">{SEARCH_STAGES[stageIdx]}</p>
         <p className="text-sm font-semibold text-moss mt-3">Usually takes 2–5 seconds when the queue is warm.</p>
 
         <button
@@ -119,18 +151,12 @@ export function MatchIntro({ match }: { match: MatchResult }) {
   return (
     <div className="fixed inset-0 z-[60] bg-pine noise overflow-hidden flex items-center justify-center px-5">
       <div className="absolute inset-0 opacity-20" style={{ backgroundImage: "radial-gradient(rgba(244,246,239,0.25) 1.1px, transparent 1.1px)", backgroundSize: "26px 26px" }} />
-      {/* floating rings */}
-      <span className="absolute -top-24 -left-24 w-72 h-72 rounded-full border-2 border-mint/30 animate-ring" />
-      <span className="absolute -bottom-20 -right-16 w-80 h-80 rounded-full border-2 border-coral/40 animate-ring" style={{ animationDelay: "0.8s" }} />
+      {/* quiet corner rings */}
+      <span className="absolute -top-24 -left-24 w-72 h-72 rounded-full border-2 border-mint/20" />
+      <span className="absolute -bottom-20 -right-16 w-80 h-80 rounded-full border-2 border-coral/25" />
 
       <div className="relative text-center max-w-lg w-full">
-        <h1 className="display text-[clamp(2.6rem,7vw,4.6rem)] text-paper leading-none mb-8" aria-label={title}>
-          {title.split("").map((ch, i) => (
-            <span key={i} className="animate-letter" style={{ animationDelay: `${i * 0.035}s` }}>
-              {ch === " " ? "\u00A0" : ch}
-            </span>
-          ))}
-        </h1>
+        <h1 className="display text-[clamp(2.6rem,7vw,4.6rem)] text-paper leading-none mb-8">{title}</h1>
 
         <div className="bg-paper border-2 border-ink rounded-2xl shadow-hard p-6 text-left animate-pop" style={{ animationDelay: "0.5s" }}>
           <div className="flex items-center gap-4 mb-4">
@@ -141,7 +167,7 @@ export function MatchIntro({ match }: { match: MatchResult }) {
                 {settings.showCountry && <span>{p.flag} {p.country}</span>}
                 {settings.showCountry && settings.showAge && <span className="text-moss"> · </span>}
                 {settings.showAge && <span>{p.age}</span>}
-                {!settings.showCountry && !settings.showAge && <span>Someone on your wavelength</span>}
+                {!settings.showCountry && !settings.showAge && <span>Matched by shared interests</span>}
               </p>
             </div>
             <div className="text-right">
@@ -177,11 +203,9 @@ export function MatchIntro({ match }: { match: MatchResult }) {
           </div>
         </div>
 
-        <button className="btn btn-coral mt-7 text-lg px-9 py-4 animate-pop" style={{ animationDelay: "0.7s" }} onClick={() => setFlow({ stage: "chat", match })}>
+        <button className="btn btn-coral mt-7 text-lg px-9 py-4" onClick={() => setFlow({ stage: "chat", match })}>
           <Icon name="bubble" className="w-5 h-5" /> Say hi now
         </button>
-
-        <Squiggle className="w-40 h-3 mx-auto mt-6 opacity-60" color="var(--color-mint)" />
       </div>
     </div>
   );

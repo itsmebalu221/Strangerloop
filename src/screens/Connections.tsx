@@ -62,7 +62,7 @@ export default function Connections() {
       {sorted.length === 0 ? (
         <Reveal delay={120}>
           <div className="card card-ink p-10 text-center bg-white">
-            <span className="w-20 h-20 mx-auto rounded-full bg-blush border-2 border-ink inline-flex items-center justify-center mb-5 animate-bob">
+            <span className="w-20 h-20 mx-auto rounded-full bg-blush border-2 border-ink inline-flex items-center justify-center mb-5">
               <Icon name="heart" className="w-9 h-9 text-coral" />
             </span>
             <h2 className="display text-3xl mb-2">No connections yet.</h2>

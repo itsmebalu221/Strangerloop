@@ -1,6 +1,6 @@
 # StrangrLoop — strangrloop.chat
 
-**Random chats. Real wavelength.** An interest-based random stranger chat platform: meet a random person, discover shared interests, talk — and optionally turn it into a lasting connection.
+**Random chats. Real connections.** An interest-based random stranger chat platform: meet a random person, discover shared interests, talk — and optionally turn it into a lasting connection.
 
 > Random chat → Connections → Groups → Communities → Forum → Networking
 

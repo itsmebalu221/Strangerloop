@@ -1,18 +1,53 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { GUIDELINES, REPORT_REASONS, interestById } from "../data";
+import { GENERIC_STARTERS, GUIDELINES, REPORT_REASONS, STARTERS, countryFlag, interestById } from "../data";
 import { acceptProbability, greeting, makeReply, replyDelay, startersFor } from "../engine";
+import { liveSocket } from "../live";
 import { useStore } from "../store";
-import type { ChatMsg, MatchResult } from "../types";
-import { Avatar, Confetti, Icon, Modal } from "../components/ui";
+import type { ChatMsg, LiveMatch, MatchResult, Persona } from "../types";
+import { Avatar, Icon, Modal } from "../components/ui";
 
 let mid = 0;
 const msg = (from: ChatMsg["from"], text: string): ChatMsg => ({ id: `m${++mid}`, from, text, at: Date.now() });
 const fmtTime = (t: number) => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 const hasLink = (t: string) => /(https?:\/\/|www\.)|\.com\b|\.in\b|\.net\b/i.test(t);
 
-export default function Chat({ match }: { match: MatchResult }) {
+function liveStarters(shared: string[]): string[] {
+  const picks: string[] = [];
+  for (const s of STARTERS) {
+    if (shared.includes(s.interest)) picks.push(s.starters[0]);
+    if (picks.length >= 2) break;
+  }
+  while (picks.length < 3) picks.push(GENERIC_STARTERS[picks.length % GENERIC_STARTERS.length]);
+  return picks;
+}
+
+export default function Chat({ match, live }: { match?: MatchResult; live?: LiveMatch }) {
   const { setFlow, blockUser, bumpStats, addConnection, toast, settings, connections, blocked } = useStore();
-  const p = match.persona;
+  const isLive = Boolean(live);
+  const sessionId = live?.sessionId;
+
+  // A real peer (live server) is presented through the same Persona shape the
+  // simulation uses, so the whole UI works unchanged in both modes.
+  const p: Persona = match
+    ? match.persona
+    : {
+        id: live!.peer.id,
+        name: live!.peer.name,
+        gender: live!.peer.gender,
+        age: live!.peer.age,
+        country: live!.peer.country,
+        flag: countryFlag(live!.peer.country),
+        languages: live!.peer.languages,
+        interests: live!.peer.interests,
+        conv: live!.peer.conversationTypes,
+        bio: live!.peer.bio ?? "",
+        willingness: 0.7,
+        speed: 1,
+        lines: [],
+        questions: [],
+      };
+  const sharedIds = live ? live.shared : match!.shared;
+  const matchPct = live ? live.pct : match!.pct;
 
   const [messages, setMessages] = useState<ChatMsg[]>(() => [
     msg("system", `You're now chatting with ${p.name}. Be kind — and remember: never share passwords, money info, or your exact address.`),
@@ -25,7 +60,6 @@ export default function Chat({ match }: { match: MatchResult }) {
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [connectState, setConnectState] = useState<"none" | "sent" | "connected">("none");
   const [incoming, setIncoming] = useState(false);
-  const [burst, setBurst] = useState(0);
   const [shakeInput, setShakeInput] = useState(0);
   const [safetyDismissed, setSafetyDismissed] = useState(false);
   const [reportReason, setReportReason] = useState(REPORT_REASONS[0].id);
@@ -41,7 +75,7 @@ export default function Chat({ match }: { match: MatchResult }) {
   const alreadyConnected = connections.some((c) => c.personaId === p.id);
   const isBlocked = blocked.some((b) => b.personaId === p.id);
 
-  const starters = useMemo(() => startersFor(match), [match]);
+  const starters = useMemo(() => (match ? startersFor(match) : liveStarters(live!.shared)), [match, live]);
 
   const later = useCallback((fn: () => void, ms: number) => {
     const t = window.setTimeout(fn, ms);
@@ -54,8 +88,9 @@ export default function Chat({ match }: { match: MatchResult }) {
     return () => list.forEach((t) => window.clearTimeout(t));
   }, []);
 
-  /* stranger opens the conversation */
+  /* stranger opens the conversation (simulation only — live peers say hi themselves) */
   useEffect(() => {
+    if (!match) return;
     const delay = 1300 + Math.random() * 700;
     later(() => setTyping(true), delay);
     later(() => {
@@ -71,11 +106,83 @@ export default function Chat({ match }: { match: MatchResult }) {
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [messages, typing]);
 
+  /* live-mode socket subscriptions */
+  useEffect(() => {
+    if (!isLive || !sessionId) return;
+    let disposed = false;
+    let typingOff = 0;
+    const s = liveSocket();
+    if (!s) return;
+
+    const onMessage = (m: { sessionId: string; from: string; text: string; at: number }) => {
+      if (disposed || m.sessionId !== sessionId || m.from === p.id) return;
+      setTyping(false);
+      setMessages((prev) => [...prev, { id: `l${m.at}-${m.from}`, from: "them", text: m.text, at: m.at }]);
+    };
+    const onTyping = (t: { sessionId: string }) => {
+      if (disposed || t.sessionId !== sessionId) return;
+      setTyping(true);
+      window.clearTimeout(typingOff);
+      typingOff = window.setTimeout(() => setTyping(false), 2600);
+    };
+    const onEnded = (e: { sessionId: string; reason: string }) => {
+      if (disposed || e.sessionId !== sessionId) return;
+      const why = e.reason === "next" ? "moved on to a new conversation." : e.reason === "disconnect" ? "went offline." : "left the chat.";
+      setMessages((prev) => [...prev, msg("system", `${p.name} ${why}`)]);
+      toast(`${p.name} ${why}`, "info");
+    };
+    const onTerminated = (e: { sessionId: string }) => {
+      if (disposed || e.sessionId !== sessionId) return;
+      setFlow({ stage: "idle" });
+      toast("This conversation was ended by our safety systems.", "warn");
+    };
+    const onIncoming = (e: { sessionId: string }) => {
+      if (disposed || e.sessionId !== sessionId) return;
+      setIncoming(true);
+      if (settings.notifyConnect) toast(`${p.name} wants to connect with you`, "success");
+    };
+    const onEstablished = (e: { sessionId: string }) => {
+      if (disposed || e.sessionId !== sessionId) return;
+      doConnectSuccess(false);
+      toast(`🎉 You and ${p.name} connected!`, "success");
+    };
+    const onBlocked = () => {
+      if (disposed) return;
+      toast("Message not sent — it looked like spam or something unsafe.", "warn");
+    };
+    const onWarn = (w: { category: string }) => {
+      if (disposed) return;
+      setMessages((prev) => [...prev, msg("system", "Heads-up: a moderator bot flagged that message. Keep it friendly — repeated flags pause matching.")]);
+      void w;
+    };
+
+    s.on("chat:message", onMessage);
+    s.on("chat:typing", onTyping);
+    s.on("chat:ended", onEnded);
+    s.on("chat:terminated", onTerminated);
+    s.on("connect:incoming", onIncoming);
+    s.on("connect:established", onEstablished);
+    s.on("chat:blocked", onBlocked);
+    s.on("chat:warn", onWarn);
+    return () => {
+      disposed = true;
+      window.clearTimeout(typingOff);
+      s.off("chat:message", onMessage);
+      s.off("chat:typing", onTyping);
+      s.off("chat:ended", onEnded);
+      s.off("chat:terminated", onTerminated);
+      s.off("connect:incoming", onIncoming);
+      s.off("connect:established", onEstablished);
+      s.off("chat:blocked", onBlocked);
+      s.off("chat:warn", onWarn);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLive, sessionId]);
+
   const doConnectSuccess = useCallback(
     (theyInitiated: boolean) => {
       setConnectState("connected");
       setIncoming(false);
-      setBurst(Date.now());
       bumpStats({ connects: 1 });
       addConnection({
         id: `c-${p.id}`,
@@ -84,7 +191,7 @@ export default function Chat({ match }: { match: MatchResult }) {
         flag: p.flag,
         country: p.country,
         interests: p.interests,
-        shared: match.shared,
+        shared: sharedIds,
         metAt: Date.now(),
         color: p.willingness > 0.75 ? "#2FBF8F" : "#FF4B2E",
       });
@@ -109,6 +216,12 @@ export default function Chat({ match }: { match: MatchResult }) {
     setConnectState("sent");
     setMenuOpen(false);
     toast(`Connect request sent to ${p.name}`, "info");
+
+    if (isLive) {
+      // the server turns it into a connection when (and only when) both opt in
+      liveSocket()?.emit("connect:request", { sessionId });
+      return;
+    }
     later(() => {
       const roll = Math.random();
       if (roll < acceptProbability(p, countRef.current)) {
@@ -134,7 +247,12 @@ export default function Chat({ match }: { match: MatchResult }) {
     bumpStats({ messages: 1 });
     countRef.current += 1;
 
-    // typing + reply
+    if (isLive) {
+      liveSocket()?.emit("chat:message", { sessionId, text });
+      return;
+    }
+
+    // typing + reply (simulation)
     const delay = replyDelay(p, text);
     later(() => setTyping(true), 500);
     later(() => {
@@ -154,11 +272,13 @@ export default function Chat({ match }: { match: MatchResult }) {
 
   const next = () => {
     bumpStats({ nexts: 1 });
+    if (isLive) liveSocket()?.emit("chat:next", { sessionId });
     setFlow({ stage: "searching" });
   };
 
   const finishReport = () => {
     bumpStats({ reports: 1 });
+    if (isLive) liveSocket()?.emit("report", { sessionId, reported: p.id, reason: reportReason, details: reportDetails });
     if (reportBlock) blockUser({ personaId: p.id, name: p.name, at: Date.now(), reason: reportReason });
     setReportOpen(false);
     setFlow({ stage: "idle" });
@@ -166,6 +286,7 @@ export default function Chat({ match }: { match: MatchResult }) {
   };
 
   const finishBlock = () => {
+    if (isLive) liveSocket()?.emit("block", { userId: p.id, sessionId });
     blockUser({ personaId: p.id, name: p.name, at: Date.now(), reason: "blocked" });
     setBlockOpen(false);
     setFlow({ stage: "idle" });
@@ -176,7 +297,6 @@ export default function Chat({ match }: { match: MatchResult }) {
 
   return (
     <div className="fixed inset-0 z-[55] bg-parch flex flex-col noise">
-      <Confetti burst={burst} />
 
       {/* ============ header ============ */}
       <header className="bg-paper border-b-2 border-ink px-4 py-3 flex items-center gap-3 shrink-0">
@@ -193,10 +313,10 @@ export default function Chat({ match }: { match: MatchResult }) {
             <span className="text-moss font-semibold text-xs ml-1.5">{settings.showAge && p.age}</span>
           </p>
           <p className="text-xs font-semibold text-fern truncate">
-            {match.shared.length > 0
-              ? match.shared.slice(0, 3).map((id) => `${interestById(id)?.emoji} ${interestById(id)?.label}`).join(" • ")
+            {sharedIds.length > 0
+              ? sharedIds.slice(0, 3).map((id) => `${interestById(id)?.emoji} ${interestById(id)?.label}`).join(" • ")
               : "Exploring new territory together"}
-            <span className="text-coral font-mono ml-1.5">{match.pct}% match</span>
+            <span className="text-coral font-mono ml-1.5">{matchPct}% match</span>
           </p>
         </div>
 
@@ -249,11 +369,11 @@ export default function Chat({ match }: { match: MatchResult }) {
       <div ref={feedRef} className="flex-1 overflow-y-auto px-4 py-5">
         <div className="max-w-2xl mx-auto space-y-3">
           {/* shared interests card */}
-          {match.shared.length > 0 && (
+          {sharedIds.length > 0 && (
             <div className="card p-4 mb-2 animate-pop">
               <p className="mono-label text-fern mb-2.5">You both like</p>
               <div className="flex flex-wrap gap-1.5 mb-4">
-                {match.shared.map((id) => {
+                {sharedIds.map((id) => {
                   const i = interestById(id);
                   return i ? (
                     <span key={id} className="chip chip-static bg-butter border-ink/25">
@@ -337,15 +457,19 @@ export default function Chat({ match }: { match: MatchResult }) {
 
       {/* ============ input bar ============ */}
       <footer className="bg-paper border-t-2 border-ink px-4 py-3.5 shrink-0">
-        <div className="max-w-2xl mx-auto flex items-center gap-2.5" key={shakeInput}>
-          <div className={`flex-1 ${shakeInput ? "animate-shake" : ""}`}>
+        <div className="max-w-2xl mx-auto flex items-center gap-2.5">
+          <div className="flex-1">
             <input
               ref={inputRef}
-              className="field"
+              className={`field ${shakeInput ? "border-ember" : ""}`}
               placeholder="Type a message…"
               value={input}
               maxLength={500}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                setInput(e.target.value);
+                if (shakeInput) setShakeInput(0);
+                if (isLive && sessionId) liveSocket()?.emit("chat:typing", { sessionId });
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();

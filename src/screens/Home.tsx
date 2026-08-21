@@ -3,7 +3,7 @@ import { CONVERSATION_TYPES, INTERESTS, MATCH_LEVELS, interestById } from "../da
 import { randomQueuePersonas } from "../engine";
 import { useStore } from "../store";
 import type { Persona, Prefs } from "../types";
-import { Avatar, Icon, Marquee, OnlinePill, Reveal, Squiggle } from "../components/ui";
+import { Avatar, Icon, OnlinePill, Reveal, Squiggle } from "../components/ui";
 import PrefsEditor from "../components/PrefsEditor";
 
 interface QueueRow {
@@ -114,7 +114,7 @@ export default function Home() {
 
           {/* CTA */}
           <div className="flex flex-wrap items-center gap-4 mt-8 animate-rise" style={{ animationDelay: "0.24s" }}>
-            <button onClick={startSearch} className="btn btn-coral text-[1.35rem] px-10 py-5 animate-glow" style={{ borderRadius: 18 }}>
+            <button onClick={startSearch} className="btn btn-coral text-[1.35rem] px-10 py-5" style={{ borderRadius: 18 }}>
               <Icon name="radar" className="w-6 h-6" />
               FIND SOMEONE
             </button>
@@ -150,7 +150,7 @@ export default function Home() {
 
             <div className="divide-y divide-ink/8">
               {rows.map((r, i) => (
-                <div key={r.persona.id} className="flex items-center gap-3.5 px-5 py-3.5 animate-ticker" style={{ animationDelay: `${i * 0.06}s` }}>
+                <div key={r.persona.id} className="flex items-center gap-3.5 px-5 py-3.5">
                   <Avatar name={r.persona.name} color={["#FF4B2E", "#2FBF8F", "#FFC24B", "#5B8DEF", "#E2618E"][i % 5]} size={38} />
                   <div className="min-w-0 flex-1">
                     <p className="font-bold text-sm leading-tight truncate">
@@ -197,14 +197,14 @@ export default function Home() {
 
       {/* ================= MARQUEE ================= */}
       <div className="border-y-2 border-ink bg-amber py-3 -rotate-1 scale-[1.01] my-4">
-        <Marquee>
+        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 py-4">
           {INTERESTS.map((i) => (
             <span key={i.id} className="display text-lg whitespace-nowrap flex items-center gap-6">
               <span>{i.emoji} {i.label}</span>
               <Icon name="wave" className="w-6 h-6 text-ink/40" />
             </span>
           ))}
-        </Marquee>
+        </div>
       </div>
 
       {/* ================= HOW MATCHING WORKS ================= */}

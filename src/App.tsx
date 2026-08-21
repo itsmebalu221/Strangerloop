@@ -1,5 +1,8 @@
+import { useEffect, useState } from "react";
 import { StoreProvider, useStore } from "./store";
-import type { View } from "./types";
+import { LIVE_ENABLED } from "./config";
+import { getLiveSocket, onLiveStats } from "./live";
+import type { LiveStats, View } from "./types";
 import { AUTH_MODE } from "./config";
 import { Icon, Logo, LogoMark, OnlinePill, ToastHost } from "./components/ui";
 import type { IconName } from "./components/ui";
@@ -21,6 +24,14 @@ const NAV: { id: View; label: string; icon: IconName }[] = [
 
 function Shell() {
   const { profile, flow, view, setView, connections, stats, authUser, authReady } = useStore();
+  const [liveStats, setLiveStats] = useState<LiveStats | null>(null);
+
+  useEffect(() => {
+    if (!LIVE_ENABLED) return;
+    const off = onLiveStats(setLiveStats);
+    void getLiveSocket();
+    return off;
+  }, []);
 
   if (!authReady) return <Boot />;
   if (!authUser) return <AuthScreen />;
@@ -58,7 +69,7 @@ function Shell() {
             ))}
           </nav>
           <div className="hidden sm:block">
-            <OnlinePill count={1287 + Math.round(Math.sin(stats.chats) * 40)} />
+            <OnlinePill count={liveStats ? liveStats.online : 1287 + Math.round(Math.sin(stats.chats) * 40)} />
           </div>
         </div>
       </header>
@@ -93,7 +104,8 @@ function Shell() {
       {/* ================= flow overlays ================= */}
       {flow.stage === "searching" && <Searching />}
       {flow.stage === "intro" && <MatchIntro match={flow.match} />}
-      {flow.stage === "chat" && <Chat key={`${flow.match.persona.id}-${stats.chats}`} match={flow.match} />}
+      {flow.stage === "chat" && "match" in flow && <Chat key={`${flow.match.persona.id}-${stats.chats}`} match={flow.match} />}
+      {flow.stage === "chat" && "live" in flow && <Chat key={flow.live.sessionId} live={flow.live} />}
     </div>
   );
 }
@@ -102,7 +114,7 @@ function Boot() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-6 noise relative">
       <div className="absolute inset-0 bg-dots opacity-50 pointer-events-none" />
-      <div className="relative animate-bob">
+      <div className="relative">
         <LogoMark size={68} />
       </div>
       <div className="relative text-center">

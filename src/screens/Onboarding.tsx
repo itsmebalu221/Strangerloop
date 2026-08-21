@@ -19,7 +19,6 @@ const GENDERS: { id: Gender; label: string; hint: string }[] = [
 export default function Onboarding() {
   const { saveProfile, setPrefs, toast } = useStore();
   const [step, setStep] = useState(0);
-  const [shakeKey, setShakeKey] = useState(0);
 
   // step state
   const [dob, setDob] = useState("");
@@ -34,7 +33,6 @@ export default function Onboarding() {
 
   const fail = (msg: string) => {
     setError(msg);
-    setShakeKey((k) => k + 1);
   };
 
   const age = useMemo(() => (dob ? ageFromBirthDate(dob) : null), [dob]);
@@ -89,8 +87,6 @@ export default function Onboarding() {
   return (
     <div className="min-h-screen noise relative">
       <div className="absolute inset-0 bg-dots opacity-60 pointer-events-none" />
-      {/* floating interest tags */}
-      <FloatingTags />
 
       <div className="relative max-w-6xl mx-auto px-5 pt-8 pb-24">
         {/* header */}
@@ -109,7 +105,7 @@ export default function Onboarding() {
           </div>
         </header>
 
-        <div key={shakeKey} className={error ? "animate-shake" : ""}>
+        <div>
           {/* ---------------- STEP 0 : WELCOME ---------------- */}
           {step === 0 && (
             <div className="grid lg:grid-cols-[1.15fr_0.85fr] gap-12 items-center animate-rise">
@@ -168,19 +164,43 @@ export default function Onboarding() {
                 </div>
               </div>
 
-              {/* illustration */}
+              {/* conversation preview */}
               <div className="relative hidden lg:block">
-                <div className="rotate-2 rounded-2xl border-2 border-ink shadow-hard overflow-hidden bg-parch">
-                  <img
-                    src="https://image.qwenlm.ai/generated-images/33afa509-a52a-4ec8-9562-71d8886121eb/_result.png"
-                    alt="Two people connecting over shared interests"
-                    className="w-full h-auto block"
-                  />
+                <div className="rounded-2xl border-2 border-ink shadow-hard overflow-hidden bg-white">
+                  <div className="bg-pine text-paper px-5 py-4 flex items-center gap-3">
+                    <span className="w-10 h-10 rounded-full bg-mint border-2 border-ink inline-flex items-center justify-center font-bold text-ink text-sm">AK</span>
+                    <div className="flex-1">
+                      <p className="font-bold leading-tight">Aarav 🇮🇳</p>
+                      <p className="text-[0.7rem] font-mono text-paper/60">92% match · 3 shared interests</p>
+                    </div>
+                    <span className="chip chip-static chip-pad text-[0.68rem] bg-seafoam border-mint text-teal">online</span>
+                  </div>
+                  <div className="px-5 py-5">
+                    <p className="mono-label text-moss mb-2.5">You both like</p>
+                    <div className="flex flex-wrap gap-1.5 mb-5">
+                      <span className="chip chip-static bg-butter border-ink/25">💻 Programming</span>
+                      <span className="chip chip-static bg-butter border-ink/25">🤖 AI</span>
+                      <span className="chip chip-static bg-butter border-ink/25">🚀 Startups</span>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex justify-start">
+                        <div className="max-w-[85%] rounded-2xl rounded-bl-md bg-white border-2 border-ink/12 px-4 py-2.5">
+                          <p className="text-[0.92rem] font-medium leading-relaxed">I've been deep in a FastAPI + React rabbit hole this week — what are you building?</p>
+                        </div>
+                      </div>
+                      <div className="flex justify-end">
+                        <div className="max-w-[85%] rounded-2xl rounded-br-md bg-ink text-paper px-4 py-2.5">
+                          <p className="text-[0.92rem] font-medium leading-relaxed">A RAG pipeline for my lecture notes. Ask me anything 🙃</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="border-t-2 border-ink/10 bg-parch px-5 py-3.5 flex items-center gap-2.5">
+                    <span className="flex-1 rounded-xl border-2 border-ink/15 bg-white px-4 py-2.5 text-sm font-medium text-moss">Type a message…</span>
+                    <span className="btn btn-coral btn-sm pointer-events-none">Next →</span>
+                  </div>
                 </div>
-                <span className="absolute -left-5 top-8 -rotate-6 bg-amber border-2 border-ink rounded-lg px-3 py-1.5 text-sm font-bold shadow-hard-sm animate-bob">💻 + 🎧 = 💬</span>
-                <span className="absolute -right-4 bottom-10 rotate-3 bg-mint border-2 border-ink rounded-lg px-3 py-1.5 text-sm font-bold shadow-hard-sm animate-bob" style={{ animationDelay: "0.7s" }}>
-                  matched in 3.2s
-                </span>
+                <p className="text-center text-xs font-semibold text-moss mt-4">A real conversation, seconds after hitting Find.</p>
               </div>
             </div>
           )}
@@ -332,27 +352,4 @@ export default function Onboarding() {
   );
 }
 
-/* ambient floating tags behind onboarding */
-function FloatingTags() {
-  const tags = [
-    { t: "💻 Programming", x: "6%", y: "18%", rot: -8, d: "0s" },
-    { t: "🎧 Music", x: "88%", y: "12%", rot: 7, d: "1.2s" },
-    { t: "🎮 PC Gaming", x: "80%", y: "78%", rot: -5, d: "0.6s" },
-    { t: "✈️ Travel", x: "8%", y: "72%", rot: 6, d: "1.8s" },
-    { t: "🤖 AI", x: "46%", y: "6%", rot: -4, d: "2.4s" },
-    { t: "📚 Books", x: "60%", y: "90%", rot: 5, d: "0.3s" },
-  ];
-  return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none hidden md:block" aria-hidden="true">
-      {tags.map((x) => (
-        <span
-          key={x.t}
-          className="absolute rounded-full border-2 border-ink/10 bg-white/70 px-3.5 py-1.5 text-sm font-bold text-fern animate-floaty"
-          style={{ left: x.x, top: x.y, ["--rot" as string]: `${x.rot}deg`, animationDelay: x.d }}
-        >
-          {x.t}
-        </span>
-      ))}
-    </div>
-  );
-}
+

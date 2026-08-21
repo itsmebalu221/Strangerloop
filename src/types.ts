@@ -100,10 +100,42 @@ export interface UserSettings {
   showAge: boolean;
 }
 
+/* ---------- live server matches (strangrloop server) ---------- */
+export interface LivePeer {
+  id: string;
+  name: string;
+  gender: Gender;
+  age: AgeRange;
+  country: string;
+  languages: string[];
+  interests: string[];
+  conversationTypes: string[];
+  bio?: string;
+}
+
+export interface LiveMatch {
+  sessionId: string;
+  peer: LivePeer;
+  shared: string[];
+  sharedConv: string[];
+  sharedLang: string | null;
+  score: number;
+  pct: number;
+  level: 1 | 2 | 3 | 4 | 5;
+}
+
+export interface LiveStats {
+  online: number;
+  searching: number;
+  activeChats: number;
+  matchedToday: number;
+}
+
 export type Flow =
   | { stage: "idle" }
   | { stage: "searching" }
   | { stage: "intro"; match: MatchResult }
-  | { stage: "chat"; match: MatchResult };
+  | { stage: "chat"; match: MatchResult }
+  | { stage: "chat"; live: LiveMatch };
 
 export type View = "home" | "connections" | "profile" | "settings";

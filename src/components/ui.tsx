@@ -249,48 +249,6 @@ export function Reveal({ children, delay = 0, className = "" }: { children: Reac
   );
 }
 
-/* ================= marquee ================= */
-export function Marquee({ children }: { children: ReactNode }) {
-  return (
-    <div className="overflow-hidden marquee-hover select-none">
-      <div className="flex w-max animate-marquee gap-0">
-        <div className="flex items-center gap-6 pr-6">{children}</div>
-        <div className="flex items-center gap-6 pr-6" aria-hidden="true">{children}</div>
-      </div>
-    </div>
-  );
-}
-
-/* ================= confetti ================= */
-export function Confetti({ burst }: { burst: number }) {
-  const [pieces, setPieces] = useState<{ id: number; left: number; color: string; delay: number; rot: number }[]>([]);
-  useEffect(() => {
-    if (!burst) return;
-    const colors = ["#FF4B2E", "#FFC24B", "#2FBF8F", "#0F5D4E", "#5B8DEF", "#E2618E"];
-    const next = Array.from({ length: 36 }, (_, i) => ({
-      id: burst * 100 + i,
-      left: Math.random() * 100,
-      color: colors[i % colors.length],
-      delay: Math.random() * 0.35,
-      rot: Math.random() * 360,
-    }));
-    setPieces(next);
-    const t = window.setTimeout(() => setPieces([]), 2800);
-    return () => window.clearTimeout(t);
-  }, [burst]);
-  return (
-    <>
-      {pieces.map((p) => (
-        <span
-          key={p.id}
-          className="confetti-piece"
-          style={{ left: `${p.left}vw`, background: p.color, animationDelay: `${p.delay}s`, transform: `rotate(${p.rot}deg)`, borderRadius: p.id % 3 === 0 ? "50%" : "2px" }}
-        />
-      ))}
-    </>
-  );
-}
-
 /* ================= misc ================= */
 export function OnlinePill({ count }: { count: number }) {
   return (

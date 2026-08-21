@@ -2,11 +2,11 @@ import { useEffect, useState } from "react";
 import { continueAsGuest, googleSignInAvailable, signInWithEmail, signInWithGoogle, signUpWithEmail } from "../auth";
 import { APP_NAME, AUTH_MODE, DEMO_AUTH_ENABLED, TAGLINE } from "../config";
 import { useStore } from "../store";
-import { GoogleIcon, Icon, LogoMark, Marquee } from "../components/ui";
+import { GoogleIcon, Icon, LogoMark } from "../components/ui";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
-const MARQUEE_TAGS = [
+const INTEREST_TAGS: string[] = [
   "💻 Programming", "🤖 AI", "🎮 PC Gaming", "🎬 Movies", "🎧 Music", "✈️ Travel", "📚 Books",
   "🚀 Startups", "🔬 Science", "🍜 Food", "⚖️ Debate", "📷 Photography", "🗣️ Languages", "💪 Fitness",
 ];
@@ -88,7 +88,7 @@ export default function AuthScreen() {
           <h1 className="display text-[clamp(2.8rem,4.5vw,4.2rem)] leading-[0.98] mb-6">
             Random chats.
             <br />
-            Real <span className="text-amber">wavelength</span>.
+            Real <span className="text-amber">connections</span>.
           </h1>
           <p className="text-paper/75 font-medium text-lg max-w-md mb-9">
             Skip the small-talk lottery. We match you with strangers who share your interests — score them on language, age and vibe — then get out of the way.
@@ -112,14 +112,14 @@ export default function AuthScreen() {
           </div>
         </div>
 
-        <div className="relative -mx-12 border-t border-paper/15 pt-5">
-          <Marquee>
-            {MARQUEE_TAGS.map((t) => (
-              <span key={t} className="inline-flex items-center gap-2 text-sm font-bold text-paper/55">
-                {t} <span className="text-amber">✦</span>
+        <div className="relative -mx-12 border-t border-paper/15 px-12 pt-5">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            {INTEREST_TAGS.map((t) => (
+              <span key={t} className="text-sm font-bold text-paper/50">
+                {t}
               </span>
             ))}
-          </Marquee>
+          </div>
         </div>
       </aside>
 
