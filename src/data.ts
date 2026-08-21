@@ -568,7 +568,7 @@ export const GUIDELINES = [
 ];
 
 export const SAFETY_TIPS = [
-  "Keep conversations on Wavelength until you fully trust someone.",
+  "Keep conversations on StrangrLoop until you fully trust someone.",
   "Never send money, gift cards, or crypto — not even 'just to verify'.",
   "Don't share your exact address, workplace, or daily routine.",
   "Video elsewhere only when you're sure, and never under pressure.",

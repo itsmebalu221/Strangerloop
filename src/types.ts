@@ -79,6 +79,13 @@ export interface Toast {
   kind: "info" | "success" | "warn" | "danger";
 }
 
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
+  provider: "google" | "email" | "demo";
+}
+
 export interface SessionStats {
   chats: number;
   nexts: number;

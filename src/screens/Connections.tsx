@@ -148,7 +148,7 @@ export default function Connections() {
         <Reveal delay={200}>
           <p className="flex items-center gap-2.5 text-sm font-semibold text-fern mt-8 justify-center">
             <Icon name="lock" className="w-4.5 h-4.5 text-teal" />
-            Connections stay inside Wavelength — no emails, numbers, or profiles are ever exchanged.
+            Connections stay inside StrangrLoop — no emails, numbers, or profiles are ever exchanged.
           </p>
         </Reveal>
       )}

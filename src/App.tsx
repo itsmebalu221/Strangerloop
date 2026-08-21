@@ -1,7 +1,9 @@
 import { StoreProvider, useStore } from "./store";
 import type { View } from "./types";
-import { Icon, Logo, OnlinePill, ToastHost } from "./components/ui";
+import { AUTH_MODE } from "./config";
+import { Icon, Logo, LogoMark, OnlinePill, ToastHost } from "./components/ui";
 import type { IconName } from "./components/ui";
+import AuthScreen from "./screens/Auth";
 import Onboarding from "./screens/Onboarding";
 import Home from "./screens/Home";
 import Connections from "./screens/Connections";
@@ -18,8 +20,10 @@ const NAV: { id: View; label: string; icon: IconName }[] = [
 ];
 
 function Shell() {
-  const { profile, flow, view, setView, connections, stats } = useStore();
+  const { profile, flow, view, setView, connections, stats, authUser, authReady } = useStore();
 
+  if (!authReady) return <Boot />;
+  if (!authUser) return <AuthScreen />;
   if (!profile) return <Onboarding />;
 
   const inChatFlow = flow.stage !== "idle";
@@ -31,7 +35,7 @@ function Shell() {
       {/* ================= nav ================= */}
       <header className="sticky top-0 z-50 bg-paper/95 backdrop-blur-sm border-b-2 border-ink/10">
         <div className="max-w-6xl mx-auto px-5 py-3 flex items-center gap-3">
-          <button onClick={() => { setView("home"); if (!inChatFlow) window.scrollTo({ top: 0, behavior: "smooth" }); }} aria-label="Wavelength home">
+          <button onClick={() => { setView("home"); if (!inChatFlow) window.scrollTo({ top: 0, behavior: "smooth" }); }} aria-label="StrangrLoop home">
             <Logo />
           </button>
           <nav className="ml-auto flex items-center gap-1" aria-label="Primary">
@@ -71,12 +75,14 @@ function Shell() {
       <footer className="relative border-t-2 border-ink/10 bg-parch">
         <div className="max-w-6xl mx-auto px-5 py-8 flex flex-wrap items-center gap-x-8 gap-y-4">
           <Logo compact />
-          <span className="display text-lg">Wave<span className="text-coral">length</span></span>
+          <span className="display text-lg">Strangr<span className="text-coral">Loop</span></span>
           <p className="text-sm font-semibold text-fern">Meet interesting people who share your interests.</p>
           <div className="ml-auto flex items-center gap-2">
             <span className="chip chip-static text-xs">18+ only</span>
             <span className="chip chip-static text-xs">🛡️ moderated</span>
-            <span className="chip chip-static text-xs">no DMs leak</span>
+            <span className={`chip chip-static text-xs ${AUTH_MODE === "supabase" ? "bg-seafoam border-mint text-teal" : "bg-butter border-amber"}`}>
+              {AUTH_MODE === "supabase" ? "live auth" : "demo auth"}
+            </span>
           </div>
         </div>
         <p className="text-center text-[0.7rem] font-mono text-moss pb-5">
@@ -88,6 +94,23 @@ function Shell() {
       {flow.stage === "searching" && <Searching />}
       {flow.stage === "intro" && <MatchIntro match={flow.match} />}
       {flow.stage === "chat" && <Chat key={`${flow.match.persona.id}-${stats.chats}`} match={flow.match} />}
+    </div>
+  );
+}
+
+function Boot() {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-6 noise relative">
+      <div className="absolute inset-0 bg-dots opacity-50 pointer-events-none" />
+      <div className="relative animate-bob">
+        <LogoMark size={68} />
+      </div>
+      <div className="relative text-center">
+        <p className="display text-3xl leading-none">
+          Strangr<span className="text-coral">Loop</span>
+        </p>
+        <p className="mono-label text-moss mt-3 animate-pulse">warming up the loop…</p>
+      </div>
     </div>
   );
 }

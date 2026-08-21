@@ -43,7 +43,7 @@ export default function Onboarding() {
     setError("");
     if (step === 0) {
       if (!dob) return fail("Enter your date of birth so we can verify you're 18+.");
-      if (!age) return fail("Wavelength is for adults only — you must be 18 or older.");
+      if (!age) return fail("StrangrLoop is for adults only — you must be 18 or older.");
       if (!adult) return fail("Please confirm you're 18+ and accept the community guidelines.");
     }
     if (step === 1) {
@@ -124,7 +124,7 @@ export default function Onboarding() {
                   </span>
                 </h1>
                 <p className="text-lg text-fern font-medium max-w-xl mb-8">
-                  Wavelength drops you into a text chat with a random stranger — but one who actually shares your interests.
+                  StrangrLoop drops you into a text chat with a random stranger — but one who actually shares your interests.
                   Talk, hit <b className="text-ink">Next</b> anytime, or <b className="text-coral">Connect</b> when it clicks.
                 </p>
 
@@ -323,7 +323,7 @@ export default function Onboarding() {
             </button>
           )}
           <button className="btn btn-coral text-lg px-8 py-3.5" onClick={next}>
-            {step === 4 ? "Enter Wavelength" : "Continue"}
+            {step === 4 ? "Enter StrangrLoop" : "Continue"}
             <Icon name="arrow-right" className="w-5 h-5" />
           </button>
         </div>

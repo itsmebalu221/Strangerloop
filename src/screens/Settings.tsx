@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { authMode } from "../auth";
 import { GUIDELINES, SAFETY_TIPS } from "../data";
 import { useStore } from "../store";
 import type { Prefs } from "../types";
@@ -40,7 +41,7 @@ function Section({ title, icon, children, delay = 0 }: { title: string; icon: Pa
 }
 
 export default function Settings() {
-  const { prefs, setPrefs, settings, setSettings, blocked, unblockUser, resetAccount, toast } = useStore();
+  const { prefs, setPrefs, settings, setSettings, blocked, unblockUser, resetAccount, toast, authUser, signOut } = useStore();
   const [editPrefs, setEditPrefs] = useState(false);
   const [draft, setDraft] = useState<Prefs>(prefs);
   const [guidelinesOpen, setGuidelinesOpen] = useState(false);
@@ -154,10 +155,38 @@ export default function Settings() {
         </div>
       </Section>
 
-      {/* account */}
-      <Section title="Account" icon="user" delay={240}>
+      {/* session */}
+      <Section title="Session" icon="lock" delay={210}>
+        <div className="flex flex-wrap items-center gap-3 mb-4">
+          <span className={`chip chip-static ${authMode === "supabase" ? "bg-seafoam border-mint text-teal" : "bg-butter border-amber"}`}>
+            {authMode === "supabase" ? "● live · Supabase Auth" : "● demo · browser-local auth"}
+          </span>
+          {authUser && (
+            <span className="text-sm font-semibold text-fern truncate">
+              {authUser.email} · via {authUser.provider === "google" ? "Google" : authUser.provider === "demo" ? "guest" : "email"}
+            </span>
+          )}
+        </div>
         <p className="text-sm font-medium text-fern mb-4">
-          Your data lives in your browser for this demo. Deleting your account wipes your profile, connections, blocks and stats — instantly, no hoops.
+          {authMode === "supabase"
+            ? "Your session is managed securely by Supabase Auth with Google OAuth and email sign-in enabled."
+            : "Demo accounts live only in this browser. Add your Supabase keys to .env to switch to real Google OAuth + email auth — the README walks you through it."}
+        </p>
+        <button
+          className="btn"
+          onClick={async () => {
+            await signOut();
+            toast("Signed out — see you in the loop.", "info");
+          }}
+        >
+          <Icon name="link-off" className="w-4.5 h-4.5" /> Sign out
+        </button>
+      </Section>
+
+      {/* account */}
+      <Section title="Account" icon="user" delay={270}>
+        <p className="text-sm font-medium text-fern mb-4">
+          Deleting your account wipes your profile, connections, blocks and stats — instantly, no hoops. {authMode === "demo" ? "Demo account data lives in your browser." : ""}
         </p>
         <button className="btn btn-danger" onClick={() => { setDeleteText(""); setDeleteOpen(true); }}>
           <Icon name="trash" className="w-4.5 h-4.5" /> Delete account
@@ -165,7 +194,7 @@ export default function Settings() {
       </Section>
 
       <p className="text-center text-xs font-semibold text-moss mt-10 mb-4">
-        Wavelength · interest-based social discovery · 18+ only · v1.0 demo
+        StrangrLoop · interest-based social discovery · 18+ only · v1.0
       </p>
 
       {/* guidelines modal */}
@@ -229,6 +258,7 @@ export default function Settings() {
               onClick={() => {
                 resetAccount();
                 setDeleteOpen(false);
+                void signOut();
               }}
             >
               <Icon name="trash" className="w-4.5 h-4.5" /> Delete forever

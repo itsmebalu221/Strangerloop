@@ -1,8 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import type { BlockedUser, Connection, Flow, Prefs, Profile, SessionStats, Toast, UserSettings, View } from "./types";
+import type { AuthUser, BlockedUser, Connection, Flow, Prefs, Profile, SessionStats, Toast, UserSettings, View } from "./types";
+import { getCurrentUser, onAuthChange, signOutUser } from "./auth";
 
-const LS_KEY = "wavelength:v1";
+const LS_KEY = "strangrloop:v1";
 
 interface Persisted {
   profile: Profile | null;
@@ -59,6 +60,9 @@ interface Store extends Persisted {
   view: View;
   flow: Flow;
   toasts: Toast[];
+  authUser: AuthUser | null;
+  authReady: boolean;
+  signOut: () => Promise<void>;
   setView: (v: View) => void;
   setFlow: (f: Flow) => void;
   saveProfile: (p: Profile) => void;
@@ -88,6 +92,38 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [flow, setFlow] = useState<Flow>({ stage: "idle" });
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastId = useRef(0);
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+
+  // subscribe to the auth layer (Supabase or demo) exactly once
+  useEffect(() => {
+    let alive = true;
+    getCurrentUser()
+      .then((u) => {
+        if (alive) {
+          setAuthUser(u);
+          setAuthReady(true);
+        }
+      })
+      .catch(() => {
+        if (alive) setAuthReady(true);
+      });
+    const unsub = onAuthChange((u) => {
+      if (!alive) return;
+      setAuthUser(u);
+      setAuthReady(true);
+    });
+    return () => {
+      alive = false;
+      unsub();
+    };
+  }, []);
+
+  const signOut = useCallback(async () => {
+    await signOutUser();
+    setFlow({ stage: "idle" });
+    setView("home");
+  }, []);
 
   // persist
   useEffect(() => {
@@ -121,6 +157,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     view,
     flow,
     toasts,
+    authUser,
+    authReady,
+    signOut,
     setView,
     setFlow,
     saveProfile: setProfile,

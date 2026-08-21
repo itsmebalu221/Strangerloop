@@ -162,7 +162,7 @@ export default function Chat({ match }: { match: MatchResult }) {
     if (reportBlock) blockUser({ personaId: p.id, name: p.name, at: Date.now(), reason: reportReason });
     setReportOpen(false);
     setFlow({ stage: "idle" });
-    toast(reportBlock ? "Reported and blocked. Thanks for keeping Wavelength safe." : "Report received — it's been routed to our moderators.", "success");
+    toast(reportBlock ? "Reported and blocked. Thanks for keeping StrangrLoop safe." : "Report received — it's been routed to our moderators.", "success");
   };
 
   const finishBlock = () => {
