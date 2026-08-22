@@ -131,6 +131,19 @@ export interface LiveStats {
   matchedToday: number;
 }
 
+/** A user profile as the live server exposes it — never emails or ids-of-ids. */
+export interface PublicProfile {
+  id: string;
+  name: string;
+  gender: Gender;
+  age: AgeRange;
+  country: string;
+  languages: string[];
+  interests: string[];
+  conversationTypes: string[];
+  bio: string;
+}
+
 export type Flow =
   | { stage: "idle" }
   | { stage: "searching" }

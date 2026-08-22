@@ -54,9 +54,10 @@ export function resolveToken(token: string | undefined): Identity {
   if (!token) throw new Error("Missing token");
 
   if (AUTH_MODE === "demo") {
-    const m = /^demo:([A-Za-z0-9_-]{4,64})$/.exec(token);
+    const m = /^demo:([A-Za-z0-9_-]{4,96})$/.exec(token);
     if (!m) throw new Error("Invalid demo token — expected demo:<userId>");
-    const id = `demo_${m[1]}`;
+    // accept both raw ids and ids already carrying the demo_ prefix
+    const id = m[1].startsWith("demo_") ? m[1] : `demo_${m[1]}`;
     const existing = db.getUser(id);
     db.ensureUser(id, existing?.display_name ?? `Stranger${m[1].slice(0, 4)}`);
     return { userId: id, provider: "demo" };

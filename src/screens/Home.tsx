@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CONVERSATION_TYPES, INTERESTS, MATCH_LEVELS, interestById } from "../data";
 import { randomQueuePersonas } from "../engine";
 import { useStore } from "../store";
-import type { Persona, Prefs } from "../types";
+import { LIVE_ENABLED } from "../config";
+import { getLiveSocket, onLiveStats } from "../live";
+import type { LiveStats, Persona, Prefs } from "../types";
 import { Avatar, Icon, OnlinePill, Reveal, Squiggle } from "../components/ui";
 import PrefsEditor from "../components/PrefsEditor";
 
@@ -15,6 +17,15 @@ export default function Home() {
   const { profile, prefs, setPrefs, blocked, setFlow, setView, stats, toast } = useStore();
   const [prefsOpen, setPrefsOpen] = useState(false);
   const [draft, setDraft] = useState<Prefs>(prefs);
+  const [liveStats, setLiveStats] = useState<LiveStats | null>(null);
+
+  /* real queue presence when the live server is configured */
+  useEffect(() => {
+    if (!LIVE_ENABLED) return;
+    const off = onLiveStats(setLiveStats);
+    void getLiveSocket();
+    return off;
+  }, []);
 
   /* ---------- live world simulation ---------- */
   const [rows, setRows] = useState<QueueRow[]>(() =>
@@ -143,13 +154,23 @@ export default function Home() {
                   <span className="absolute inline-flex w-full h-full rounded-full bg-mint animate-pulse-dot" />
                   <span className="relative inline-flex rounded-full w-2 h-2 bg-mint" />
                 </span>
-                LIVE — searching right now
+                {LIVE_ENABLED ? "LIVE — searching right now" : "DEMO QUEUE — simulated"}
               </span>
-              <span className="font-mono text-xs text-paper/70">{queueCount} in queue</span>
+              <span className="font-mono text-xs text-paper/70">{LIVE_ENABLED && liveStats ? `${liveStats.searching} in queue` : `${queueCount} in queue`}</span>
             </div>
 
             <div className="divide-y divide-ink/8">
-              {rows.map((r, i) => (
+              {LIVE_ENABLED ? (
+                <div className="px-5 py-7 text-center">
+                  <p className="font-bold text-sm mb-1.5">
+                    {liveStats
+                      ? `${liveStats.online.toLocaleString()} online · ${liveStats.searching} searching · ${liveStats.activeChats} chats active`
+                      : "Connecting to the live server…"}
+                  </p>
+                  <p className="text-xs font-semibold text-fern">Matches come from the real queue — hit FIND SOMEONE to join it.</p>
+                </div>
+              ) : (
+              rows.map((r, i) => (
                 <div key={r.persona.id} className="flex items-center gap-3.5 px-5 py-3.5">
                   <Avatar name={r.persona.name} color={["#FF4B2E", "#2FBF8F", "#FFC24B", "#5B8DEF", "#E2618E"][i % 5]} size={38} />
                   <div className="min-w-0 flex-1">
@@ -164,15 +185,16 @@ export default function Home() {
                   </div>
                   <span className="font-mono text-xs text-moss whitespace-nowrap">{Math.floor(r.secs / 60)}:{String(r.secs % 60).padStart(2, "0")}</span>
                 </div>
-              ))}
+              ))
+              )}
             </div>
 
             {/* metrics */}
             <div className="grid grid-cols-3 divide-x divide-ink/8 border-t-2 border-ink/10 bg-parch">
               {[
-                { label: "Online", value: online.toLocaleString() },
-                { label: "Matches today", value: matchesToday.toLocaleString() },
-                { label: "Median match", value: "3.8s" },
+                { label: "Online", value: (liveStats?.online ?? online).toLocaleString() },
+                { label: "Matches today", value: (liveStats?.matchedToday ?? matchesToday).toLocaleString() },
+                { label: LIVE_ENABLED ? "In queue" : "Median match", value: LIVE_ENABLED ? String(liveStats?.searching ?? 0) : "3.8s" },
               ].map((m) => (
                 <div key={m.label} className="px-4 py-3 text-center">
                   <p className="font-mono text-[1.05rem] font-medium leading-none">{m.value}</p>
