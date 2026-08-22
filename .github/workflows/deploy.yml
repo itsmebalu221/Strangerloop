@@ -1,0 +1,67 @@
+# Deploys StrangrLoop to GitHub Pages on every push to main.
+#
+# Builds with a RELATIVE asset base (./) so the site works at
+# https://<username>.github.io/<repo>/  — this is what fixes the
+# classic "blank screen on GitHub Pages" (assets 404ing under a subpath).
+#
+# Enable once in the repo:
+#   Settings → Pages → Build and deployment → Source: "GitHub Actions"
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (relative base for Pages subpaths)
+        run: npx vite build --base=./
+        env:
+          # Set these as repo Secrets → Actions variables if you use real auth:
+          VITE_APP_URL: ${{ vars.VITE_APP_URL || github.server_url }}
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || '' }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY || '' }}
+          VITE_SERVER_URL: ${{ vars.VITE_SERVER_URL || '' }}
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
