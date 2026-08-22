@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { Component, useEffect, useState } from "react";
+import type { ErrorInfo, ReactNode } from "react";
 import { StoreProvider, useStore } from "./store";
 import { LIVE_ENABLED } from "./config";
 import { getLiveSocket, onLiveStats } from "./live";
