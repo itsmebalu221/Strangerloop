@@ -164,7 +164,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setFlow,
     saveProfile: setProfile,
     setPrefs: setPrefsState,
-    addConnection: (c) => setConnections((prev) => (prev.some((x) => x.id === c.id) ? prev : [c, ...prev])),
+    addConnection: (c) =>
+      setConnections((prev) => (prev.some((x) => x.id === c.id || x.personaId === c.personaId) ? prev : [c, ...prev])),
     removeConnection: (id) => setConnections((prev) => prev.filter((x) => x.id !== id)),
     blockUser: (b) => setBlocked((prev) => (prev.some((x) => x.personaId === b.personaId) ? prev : [b, ...prev])),
     unblockUser: (pid) => setBlocked((prev) => prev.filter((x) => x.personaId !== pid)),

@@ -98,7 +98,9 @@ function Shell() {
           </div>
         </div>
         <p className="text-center text-[0.7rem] font-mono text-moss pb-5">
-          demo build — stranger conversations are simulated locally · random chat → connections → groups → communities → forum
+          {LIVE_ENABLED
+            ? "live build — real people over the strangrloop server · random chat → connections → groups → communities → forum"
+            : "demo build — stranger conversations are simulated locally (set VITE_SERVER_URL + run server/ for live) · random chat → connections → groups → communities → forum"}
         </p>
       </footer>
 
@@ -128,11 +130,47 @@ function Boot() {
   );
 }
 
+/* crash guard — never a blank screen */
+class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null };
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error("[StrangrLoop]", error, info);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="min-h-screen noise relative flex items-center justify-center px-5">
+          <div className="absolute inset-0 bg-dots opacity-50 pointer-events-none" />
+          <div className="relative card card-ink bg-paper p-8 max-w-md w-full text-center">
+            <span className="inline-flex mb-5"><LogoMark size={56} /></span>
+            <h1 className="display text-3xl leading-tight mb-2">Signal lost.</h1>
+            <p className="text-sm font-medium text-fern mb-5">
+              Something broke while rendering the app. Your account and connections are safe — a reload almost always fixes it.
+            </p>
+            <p className="text-left rounded-xl border-2 border-ink/12 bg-parch px-4 py-3 font-mono text-[0.7rem] text-moss break-words mb-6">
+              {this.state.error.message || String(this.state.error)}
+            </p>
+            <button className="btn btn-coral btn-md w-full" onClick={() => window.location.reload()}>
+              <Icon name="bolt" className="w-4.5 h-4.5" /> Reload StrangrLoop
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   return (
-    <StoreProvider>
-      <Shell />
-      <ToastHost />
-    </StoreProvider>
+    <ErrorBoundary>
+      <StoreProvider>
+        <Shell />
+        <ToastHost />
+      </StoreProvider>
+    </ErrorBoundary>
   );
 }
