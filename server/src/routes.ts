@@ -8,6 +8,7 @@ import { ADMIN_TOKEN, AUTH_MODE, type Prefs, type PublicProfile } from "./config
 import { resolveToken, type Identity } from "./auth.js";
 import * as db from "./db.js";
 import { getLiveStats } from "./sockets.js";
+import { sanitizePrefs } from "./matching.js";
 
 function identity(req: FastifyRequest, reply: FastifyReply): Identity | null {
   try {
@@ -40,6 +41,19 @@ function requireAdmin(req: FastifyRequest, reply: FastifyReply): boolean {
 
 const SEVERE_REASONS = new Set(["underage", "threats"]);
 
+const GENDERS = new Set(["male", "female", "nonbinary", "private"]);
+const AGES = new Set(["18–24", "25–34", "35–44", "45+"]);
+const NAME_RE = /^[a-zA-Z0-9_ ]{3,16}$/;
+
+function strList(v: unknown, maxItems: number, maxLen: number): string[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .filter((x): x is string => typeof x === "string")
+    .map((x) => x.trim().slice(0, maxLen))
+    .filter(Boolean)
+    .slice(0, maxItems);
+}
+
 export async function registerRoutes(app: FastifyInstance): Promise<void> {
   app.get("/health", async () => ({ ok: true, name: "strangrloop-server", auth: AUTH_MODE, uptime: process.uptime() }));
 
@@ -50,18 +64,18 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
     const ident = identity(req, reply);
     if (!ident) return;
     const body = req.body as Partial<PublicProfile> | null;
-    if (!body || typeof body.name !== "string" || body.name.trim().length < 3) {
-      return reply.code(400).send({ error: "Display name must be at least 3 characters." });
+    if (!body || typeof body.name !== "string" || !NAME_RE.test(body.name.trim())) {
+      return reply.code(400).send({ error: "Display name must be 3–16 characters (letters, numbers, spaces, underscores)." });
     }
     const clean: PublicProfile = {
       id: ident.userId,
-      name: body.name.trim().slice(0, 16),
-      gender: body.gender ?? "private",
-      age: body.age ?? "25–34",
+      name: body.name.trim(),
+      gender: GENDERS.has(String(body.gender)) ? (body.gender as PublicProfile["gender"]) : "private",
+      age: AGES.has(String(body.age)) ? (body.age as PublicProfile["age"]) : "25–34",
       country: String(body.country ?? "").slice(0, 40),
-      languages: Array.isArray(body.languages) ? body.languages.slice(0, 8) : ["English"],
-      interests: Array.isArray(body.interests) ? body.interests.slice(0, 10) : [],
-      conversationTypes: Array.isArray(body.conversationTypes) ? body.conversationTypes.slice(0, 6) : ["casual"],
+      languages: strList(body.languages, 8, 24).length > 0 ? strList(body.languages, 8, 24) : ["English"],
+      interests: strList(body.interests, 10, 32),
+      conversationTypes: strList(body.conversationTypes, 6, 24).length > 0 ? strList(body.conversationTypes, 6, 24) : ["casual"],
       bio: String(body.bio ?? "").slice(0, 200),
     };
     db.saveProfile(ident.userId, clean);
@@ -71,10 +85,14 @@ export async function registerRoutes(app: FastifyInstance): Promise<void> {
   app.post("/prefs", async (req, reply) => {
     const ident = identity(req, reply);
     if (!ident) return;
-    const p = req.body as Prefs | null;
-    if (!p || !Array.isArray(p.agePref) || p.agePref.length === 0) {
-      return reply.code(400).send({ error: "Keep at least one age range." });
-    }
+    const row = db.getUser(ident.userId);
+    const fallback = (row ? db.getPrefs(row) : null) ?? {
+      genderPref: "anyone" as const,
+      agePref: ["18–24", "25–34", "35–44", "45+"] as Prefs["agePref"],
+      languages: ["English"],
+      conversationTypes: ["casual"],
+    };
+    const p = sanitizePrefs(req.body, fallback);
     db.savePrefs(ident.userId, p);
     return { ok: true };
   });

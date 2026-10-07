@@ -69,6 +69,7 @@ export const CONVERSATION_TYPES = [
 export const LANGUAGES = [
   "English", "Hindi", "Telugu", "Tamil", "Kannada", "Malayalam", "Bengali", "Marathi",
   "Spanish", "Portuguese", "French", "German", "Japanese", "Korean", "Arabic", "Russian",
+  "Polish", "Turkish", "Malay",
 ];
 
 export const COUNTRIES: { name: string; flag: string }[] = [
@@ -78,7 +79,7 @@ export const COUNTRIES: { name: string; flag: string }[] = [
   { name: "France", flag: "🇫🇷" }, { name: "South Korea", flag: "🇰🇷" }, { name: "Philippines", flag: "🇵🇭" },
   { name: "Mexico", flag: "🇲🇽" }, { name: "Sweden", flag: "🇸🇪" }, { name: "Egypt", flag: "🇪🇬" },
   { name: "Singapore", flag: "🇸🇬" }, { name: "Poland", flag: "🇵🇱" }, { name: "Vietnam", flag: "🇻🇳" },
-  { name: "Spain", flag: "🇪🇸" }, { name: "Italy", flag: "🇮🇹" },
+  { name: "Spain", flag: "🇪🇸" }, { name: "Italy", flag: "🇮🇹" }, { name: "Turkey", flag: "🇹🇷" },
 ];
 
 export const countryFlag = (name: string) => COUNTRIES.find((c) => c.name === name)?.flag ?? "🌍";
@@ -182,7 +183,7 @@ export const PERSONAS: Persona[] = [
   },
   {
     id: "p08", name: "Dev", gender: "male", age: "25–34", country: "India", flag: "🇮🇳",
-    languages: ["English", "Hindi", "Telugu"], interests: ["programming", "webdev", "cricket" as string, "mobilegaming"].filter(i => i !== "cricket"),
+    languages: ["English", "Hindi", "Telugu"], interests: ["programming", "webdev", "mobilegaming"],
     conv: ["coding", "gaming"], bio: "Fullstack dev. Cricket scores in one tab, prod logs in another.", willingness: 0.68, speed: 1.15,
     lines: [
       "prod is down and I'm talking to strangers. coping mechanisms vary",
@@ -194,8 +195,8 @@ export const PERSONAS: Persona[] = [
     questions: ["frontend, backend, or fullstack?", "what are you playing on your phone?", "tabs or spaces? choose your fighter"],
   },
   {
-    id: "p09", name: "Elif", gender: "female", age: "25–34", country: "Turkey" as string, flag: "🇹🇷",
-    languages: ["English"], interests: ["fashion", "photography", "food", "travel"],
+    id: "p09", name: "Elif", gender: "female", age: "25–34", country: "Turkey", flag: "🇹🇷",
+    languages: ["Turkish", "English"], interests: ["fashion", "photography", "food", "travel"],
     conv: ["casual", "travel"], bio: "Istanbul. Thrift flips and street photography.", willingness: 0.74, speed: 0.95,
     lines: [
       "found a vintage jacket today for basically nothing. my best look ever",
@@ -234,7 +235,7 @@ export const PERSONAS: Persona[] = [
   },
   {
     id: "p12", name: "Tomas", gender: "male", age: "18–24", country: "Poland", flag: "🇵🇱",
-    languages: ["Polish" as string, "English"], interests: ["gamedev", "programming", "pcgaming", "science"],
+    languages: ["Polish", "English"], interests: ["gamedev", "programming", "pcgaming", "science"],
     conv: ["coding", "gaming"], bio: "Making a roguelike in Godot. It has a duck protagonist.", willingness: 0.77, speed: 1.2,
     lines: [
       "my game has a duck with a gun. the duck is the emotional core",
@@ -247,7 +248,7 @@ export const PERSONAS: Persona[] = [
   },
   {
     id: "p13", name: "Amara", gender: "female", age: "25–34", country: "United Kingdom", flag: "🇬🇧",
-    languages: ["English"], interests: ["books", "tv", "writing" as string, "casual"].filter(i => i !== "writing"),
+    languages: ["English"], interests: ["books", "tv", "casual"],
     conv: ["casual", "movies"], bio: "Manchester. Book club ringleader. Will recommend thrillers unprompted.", willingness: 0.8, speed: 0.9,
     lines: [
       "finished a book at 2am and just stared at the wall for twenty minutes. brilliant",
@@ -325,7 +326,7 @@ export const PERSONAS: Persona[] = [
   },
   {
     id: "p19", name: "Yuki", gender: "nonbinary", age: "18–24", country: "Japan", flag: "🇯🇵",
-    languages: ["Japanese", "English"], interests: ["anime", "gamedev", "music", "art" as string].filter(i => i !== "art"),
+    languages: ["Japanese", "English"], interests: ["anime", "gamedev", "music"],
     conv: ["gaming", "casual"], bio: "Osaka. Chiptune composer. Yes, like actual video game music.", willingness: 0.79, speed: 1,
     lines: [
       "made a chiptune on the train today. the train sounds were basically free percussion",
@@ -338,7 +339,7 @@ export const PERSONAS: Persona[] = [
   },
   {
     id: "p20", name: "Fatima", gender: "female", age: "25–34", country: "Singapore", flag: "🇸🇬",
-    languages: ["English", "Malay" as string], interests: ["food", "travel", "startups", "networking"],
+    languages: ["English", "Malay"], interests: ["food", "travel", "startups", "networking"],
     conv: ["networking", "casual"], bio: "Singapore. Product manager by day, hawker centre critic by night.", willingness: 0.81, speed: 0.95,
     lines: [
       "ran a user interview today. users are chaos and I love them",

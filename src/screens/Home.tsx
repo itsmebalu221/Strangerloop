@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CONVERSATION_TYPES, INTERESTS, MATCH_LEVELS, interestById } from "../data";
 import { randomQueuePersonas } from "../engine";
+import { LIVE_ENABLED } from "../config";
+import { getLiveSocket, onLiveStats } from "../live";
 import { useStore } from "../store";
-import type { Persona, Prefs } from "../types";
-import { Avatar, Icon, OnlinePill, Reveal, Squiggle } from "../components/ui";
+import type { LiveStats, Persona, Prefs } from "../types";
+import { Avatar, Icon, Reveal, Squiggle } from "../components/ui";
 import PrefsEditor from "../components/PrefsEditor";
 
 interface QueueRow {
@@ -22,7 +24,15 @@ export default function Home() {
   );
   const [online, setOnline] = useState(1287);
   const [matchesToday, setMatchesToday] = useState(48213);
+  const [liveStats, setLiveStats] = useState<LiveStats | null>(null);
   const tickRef = useRef(0);
+
+  useEffect(() => {
+    if (!LIVE_ENABLED) return;
+    const off = onLiveStats(setLiveStats);
+    void getLiveSocket().catch(() => undefined);
+    return off;
+  }, []);
 
   useEffect(() => {
     const t = window.setInterval(() => {
@@ -46,7 +56,9 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const queueCount = useMemo(() => Math.round(online * 0.07), [online]);
+  const shownOnline = liveStats ? liveStats.online : online;
+  const shownMatches = liveStats ? liveStats.matchedToday : matchesToday;
+  const queueCount = liveStats ? liveStats.searching : Math.round(online * 0.07);
 
   const startSearch = () => {
     if (prefs.agePref.length === 0) {
@@ -143,7 +155,7 @@ export default function Home() {
                   <span className="absolute inline-flex w-full h-full rounded-full bg-mint animate-pulse-dot" />
                   <span className="relative inline-flex rounded-full w-2 h-2 bg-mint" />
                 </span>
-                LIVE — searching right now
+                {liveStats ? "LIVE — searching right now" : "SIMULATED — demo activity"}
               </span>
               <span className="font-mono text-xs text-paper/70">{queueCount} in queue</span>
             </div>
@@ -170,8 +182,8 @@ export default function Home() {
             {/* metrics */}
             <div className="grid grid-cols-3 divide-x divide-ink/8 border-t-2 border-ink/10 bg-parch">
               {[
-                { label: "Online", value: online.toLocaleString() },
-                { label: "Matches today", value: matchesToday.toLocaleString() },
+                { label: "Online", value: shownOnline.toLocaleString() },
+                { label: "Matches today", value: shownMatches.toLocaleString() },
                 { label: "Median match", value: "3.8s" },
               ].map((m) => (
                 <div key={m.label} className="px-4 py-3 text-center">

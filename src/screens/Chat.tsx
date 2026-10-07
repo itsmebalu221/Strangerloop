@@ -70,6 +70,7 @@ export default function Chat({ match, live }: { match?: MatchResult; live?: Live
   const inputRef = useRef<HTMLInputElement>(null);
   const timers = useRef<number[]>([]);
   const countRef = useRef(0);
+  const lastTypingRef = useRef(0);
   const connectAskedRef = useRef(false);
   const incomingAskedRef = useRef(false);
   const alreadyConnected = connections.some((c) => c.personaId === p.id);
@@ -114,8 +115,10 @@ export default function Chat({ match, live }: { match?: MatchResult; live?: Live
     const s = liveSocket();
     if (!s) return;
 
+    // the server relays every message to both rooms; keep only the peer's
+    // (our own optimistic bubble was already appended in send())
     const onMessage = (m: { sessionId: string; from: string; text: string; at: number }) => {
-      if (disposed || m.sessionId !== sessionId || m.from === p.id) return;
+      if (disposed || m.sessionId !== sessionId || m.from !== p.id) return;
       setTyping(false);
       setMessages((prev) => [...prev, { id: `l${m.at}-${m.from}`, from: "them", text: m.text, at: m.at }]);
     };
@@ -127,7 +130,16 @@ export default function Chat({ match, live }: { match?: MatchResult; live?: Live
     };
     const onEnded = (e: { sessionId: string; reason: string }) => {
       if (disposed || e.sessionId !== sessionId) return;
-      const why = e.reason === "next" ? "moved on to a new conversation." : e.reason === "disconnect" ? "went offline." : "left the chat.";
+      const why =
+        e.reason === "next"
+          ? "moved on to a new conversation."
+          : e.reason === "disconnect"
+            ? "went offline."
+            : e.reason === "block"
+              ? "is no longer available."
+              : e.reason === "moderation"
+                ? "was ended by our safety systems."
+                : "left the chat.";
       setMessages((prev) => [...prev, msg("system", `${p.name} ${why}`)]);
       toast(`${p.name} ${why}`, "info");
     };
@@ -468,7 +480,11 @@ export default function Chat({ match, live }: { match?: MatchResult; live?: Live
               onChange={(e) => {
                 setInput(e.target.value);
                 if (shakeInput) setShakeInput(0);
-                if (isLive && sessionId) liveSocket()?.emit("chat:typing", { sessionId });
+                const now = Date.now();
+                if (isLive && sessionId && now - lastTypingRef.current > 900) {
+                  lastTypingRef.current = now;
+                  liveSocket()?.emit("chat:typing", { sessionId });
+                }
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {

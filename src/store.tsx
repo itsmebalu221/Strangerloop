@@ -2,8 +2,11 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from "react";
 import type { AuthUser, BlockedUser, Connection, Flow, Prefs, Profile, SessionStats, Toast, UserSettings, View } from "./types";
 import { getCurrentUser, onAuthChange, signOutUser } from "./auth";
+import { closeLiveSocket } from "./live";
 
-const LS_KEY = "strangrloop:v1";
+/** Per-user persistence — accounts on the same browser never share data. */
+const LS_PREFIX = "strangrloop:v2:";
+const LEGACY_KEY = "strangrloop:v1";
 
 interface Persisted {
   profile: Profile | null;
@@ -29,31 +32,57 @@ const DEFAULT_SETTINGS: UserSettings = {
 
 const DEFAULT_STATS: SessionStats = { chats: 0, nexts: 0, connects: 0, reports: 0, messages: 0 };
 
-function load(): Persisted {
+const DEFAULTS: Persisted = {
+  profile: null,
+  prefs: DEFAULT_PREFS,
+  connections: [],
+  blocked: [],
+  stats: DEFAULT_STATS,
+  settings: DEFAULT_SETTINGS,
+};
+
+function parseBlob(raw: string | null): Persisted | null {
+  if (!raw) return null;
   try {
-    const raw = localStorage.getItem(LS_KEY);
-    if (raw) {
-      const p = JSON.parse(raw) as Persisted;
-      return {
-        profile: p.profile ?? null,
-        prefs: { ...DEFAULT_PREFS, ...p.prefs },
-        connections: p.connections ?? [],
-        blocked: p.blocked ?? [],
-        stats: { ...DEFAULT_STATS, ...p.stats },
-        settings: { ...DEFAULT_SETTINGS, ...p.settings },
-      };
-    }
+    const p = JSON.parse(raw) as Partial<Persisted>;
+    return {
+      profile: p.profile ?? null,
+      prefs: { ...DEFAULT_PREFS, ...p.prefs },
+      connections: Array.isArray(p.connections) ? p.connections : [],
+      blocked: Array.isArray(p.blocked) ? p.blocked : [],
+      stats: { ...DEFAULT_STATS, ...p.stats },
+      settings: { ...DEFAULT_SETTINGS, ...p.settings },
+    };
   } catch {
-    /* corrupted storage — start fresh */
+    return null;
   }
-  return {
-    profile: null,
-    prefs: DEFAULT_PREFS,
-    connections: [],
-    blocked: [],
-    stats: DEFAULT_STATS,
-    settings: DEFAULT_SETTINGS,
-  };
+}
+
+function loadFor(userId: string | null): Persisted {
+  if (!userId) return DEFAULTS;
+  const scoped = parseBlob(localStorage.getItem(LS_PREFIX + userId));
+  if (scoped) return scoped;
+  // one-time migration from the pre-v2 shared key
+  const legacy = parseBlob(localStorage.getItem(LEGACY_KEY));
+  if (legacy) {
+    try {
+      localStorage.setItem(LS_PREFIX + userId, JSON.stringify(legacy));
+      localStorage.removeItem(LEGACY_KEY);
+    } catch {
+      /* storage full / private mode — non-fatal */
+    }
+    return legacy;
+  }
+  return DEFAULTS;
+}
+
+function persist(userId: string | null, data: Persisted): void {
+  if (!userId) return;
+  try {
+    localStorage.setItem(LS_PREFIX + userId, JSON.stringify(data));
+  } catch {
+    /* storage full / private mode — non-fatal */
+  }
 }
 
 interface Store extends Persisted {
@@ -62,6 +91,7 @@ interface Store extends Persisted {
   toasts: Toast[];
   authUser: AuthUser | null;
   authReady: boolean;
+  hydrated: boolean;
   signOut: () => Promise<void>;
   setView: (v: View) => void;
   setFlow: (f: Flow) => void;
@@ -81,19 +111,19 @@ interface Store extends Persisted {
 const Ctx = createContext<Store | null>(null);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const initial = useMemo(load, []);
-  const [profile, setProfile] = useState(initial.profile);
-  const [prefs, setPrefsState] = useState(initial.prefs);
-  const [connections, setConnections] = useState(initial.connections);
-  const [blocked, setBlocked] = useState(initial.blocked);
-  const [stats, setStats] = useState(initial.stats);
-  const [settings, setSettingsState] = useState(initial.settings);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [prefs, setPrefsState] = useState<Prefs>(DEFAULT_PREFS);
+  const [connections, setConnections] = useState<Connection[]>([]);
+  const [blocked, setBlocked] = useState<BlockedUser[]>([]);
+  const [stats, setStats] = useState<SessionStats>(DEFAULT_STATS);
+  const [settings, setSettingsState] = useState<UserSettings>(DEFAULT_SETTINGS);
   const [view, setView] = useState<View>("home");
   const [flow, setFlow] = useState<Flow>({ stage: "idle" });
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastId = useRef(0);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [authReady, setAuthReady] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
 
   // subscribe to the auth layer (Supabase or demo) exactly once
   useEffect(() => {
@@ -119,21 +149,38 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // hydrate persisted state per signed-in user (re-runs on account switch)
+  useEffect(() => {
+    if (!authReady) return;
+    const data = loadFor(authUser?.id ?? null);
+    setProfile(data.profile);
+    setPrefsState(data.prefs);
+    setConnections(data.connections);
+    setBlocked(data.blocked);
+    setStats(data.stats);
+    setSettingsState(data.settings);
+    setFlow({ stage: "idle" });
+    setView("home");
+    setHydrated(true);
+  }, [authReady, authUser?.id]);
+
   const signOut = useCallback(async () => {
     await signOutUser();
+    closeLiveSocket();
     setFlow({ stage: "idle" });
     setView("home");
   }, []);
 
-  // persist
+  // persist (scoped to the signed-in user)
+  const uidRef = useRef<string | null>(null);
+  uidRef.current = authUser?.id ?? null;
   useEffect(() => {
-    const data: Persisted = { profile, prefs, connections, blocked, stats, settings };
-    try {
-      localStorage.setItem(LS_KEY, JSON.stringify(data));
-    } catch {
-      /* storage full / private mode — non-fatal */
-    }
-  }, [profile, prefs, connections, blocked, stats, settings]);
+    if (!authUser || !hydrated) return;
+    persist(
+      authUser.id,
+      { profile, prefs, connections, blocked, stats, settings }
+    );
+  }, [authUser, hydrated, profile, prefs, connections, blocked, stats, settings]);
 
   const dismissToast = useCallback((id: number) => {
     setToasts((t) => t.filter((x) => x.id !== id));
@@ -147,50 +194,56 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }, 4200);
   }, []);
 
-  const value: Store = {
-    profile,
-    prefs,
-    connections,
-    blocked,
-    stats,
-    settings,
-    view,
-    flow,
-    toasts,
-    authUser,
-    authReady,
-    signOut,
-    setView,
-    setFlow,
-    saveProfile: setProfile,
-    setPrefs: setPrefsState,
-    addConnection: (c) => setConnections((prev) => (prev.some((x) => x.id === c.id) ? prev : [c, ...prev])),
-    removeConnection: (id) => setConnections((prev) => prev.filter((x) => x.id !== id)),
-    blockUser: (b) => setBlocked((prev) => (prev.some((x) => x.personaId === b.personaId) ? prev : [b, ...prev])),
-    unblockUser: (pid) => setBlocked((prev) => prev.filter((x) => x.personaId !== pid)),
-    bumpStats: (patch) =>
-      setStats((s) => {
-        const next = { ...s };
-        (Object.keys(patch) as (keyof SessionStats)[]).forEach((k) => {
-          next[k] = s[k] + (patch[k] ?? 0);
-        });
-        return next;
-      }),
-    setSettings: (s) => setSettingsState((prev) => ({ ...prev, ...s })),
-    toast,
-    dismissToast,
-    resetAccount: () => {
-      localStorage.removeItem(LS_KEY);
-      setProfile(null);
-      setPrefsState(DEFAULT_PREFS);
-      setConnections([]);
-      setBlocked([]);
-      setStats(DEFAULT_STATS);
-      setSettingsState(DEFAULT_SETTINGS);
-      setFlow({ stage: "idle" });
-      setView("home");
-    },
-  };
+  const value: Store = useMemo(
+    () => ({
+      profile,
+      prefs,
+      connections,
+      blocked,
+      stats,
+      settings,
+      view,
+      flow,
+      toasts,
+      authUser,
+      authReady,
+      hydrated,
+      signOut,
+      setView,
+      setFlow,
+      saveProfile: setProfile,
+      setPrefs: setPrefsState,
+      addConnection: (c) => setConnections((prev) => (prev.some((x) => x.id === c.id) ? prev : [c, ...prev])),
+      removeConnection: (id) => setConnections((prev) => prev.filter((x) => x.id !== id)),
+      blockUser: (b) => setBlocked((prev) => (prev.some((x) => x.personaId === b.personaId) ? prev : [b, ...prev])),
+      unblockUser: (pid) => setBlocked((prev) => prev.filter((x) => x.personaId !== pid)),
+      bumpStats: (patch) =>
+        setStats((s) => {
+          const next = { ...s };
+          (Object.keys(patch) as (keyof SessionStats)[]).forEach((k) => {
+            next[k] = s[k] + (patch[k] ?? 0);
+          });
+          return next;
+        }),
+      setSettings: (s) => setSettingsState((prev) => ({ ...prev, ...s })),
+      toast,
+      dismissToast,
+      resetAccount: () => {
+        const uid = uidRef.current;
+        if (uid) localStorage.removeItem(LS_PREFIX + uid);
+        localStorage.removeItem(LEGACY_KEY);
+        setProfile(null);
+        setPrefsState(DEFAULT_PREFS);
+        setConnections([]);
+        setBlocked([]);
+        setStats(DEFAULT_STATS);
+        setSettingsState(DEFAULT_SETTINGS);
+        setFlow({ stage: "idle" });
+        setView("home");
+      },
+    }),
+    [profile, prefs, connections, blocked, stats, settings, view, flow, toasts, authUser, authReady, hydrated, signOut, toast, dismissToast]
+  );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

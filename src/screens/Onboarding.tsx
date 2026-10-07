@@ -9,6 +9,13 @@ import type { Prefs } from "../types";
 
 const STEPS = ["Welcome", "Identity", "Languages", "Interests", "Preferences"];
 
+/** latest allowed birth date = exactly 18 years ago today */
+function maxDob(): string {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - 18);
+  return d.toISOString().slice(0, 10);
+}
+
 const GENDERS: { id: Gender; label: string; hint: string }[] = [
   { id: "male", label: "Male", hint: "Shown as a preference, never as a dossier" },
   { id: "female", label: "Female", hint: "Shown as a preference, never as a dossier" },
@@ -94,7 +101,7 @@ export default function Onboarding() {
           <span className="inline-flex items-center gap-2.5">
             <LogoMark size={40} />
             <span className="display text-2xl tracking-tight">
-              Wave<span className="text-coral">length</span>
+              Strangr<span className="text-coral">Loop</span>
             </span>
           </span>
           {/* progress */}
@@ -146,7 +153,7 @@ export default function Onboarding() {
                   <div className="flex flex-wrap gap-4 items-end">
                     <label className="flex-1 min-w-[190px]">
                       <span className="block text-xs font-bold mb-1.5 text-fern">Date of birth</span>
-                      <input type="date" className="field" value={dob} max="2010-01-01" onChange={(e) => setDob(e.target.value)} />
+                      <input type="date" className="field" value={dob} max={maxDob()} onChange={(e) => setDob(e.target.value)} />
                     </label>
                     <label className="flex items-center gap-2.5 cursor-pointer select-none pb-2.5">
                       <span

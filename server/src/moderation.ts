@@ -111,6 +111,9 @@ interface Bucket {
 }
 
 const buckets = new Map<string, Bucket>();
+const lastFloodLog = new Map<string, number>();
+const FLOOD_LOG_COOLDOWN_MS = 30_000;
+const BUCKET_TTL_MS = 10 * 60_000;
 
 /** true = allowed */
 export function consumeMessageToken(key: string): boolean {
@@ -120,7 +123,12 @@ export function consumeMessageToken(key: string): boolean {
   b.updated = now;
   buckets.set(key, b);
   if (b.tokens < 1) {
-    db.logModEvent(key, "flood", "rate-limit", "message burst exceeded");
+    // one DB row per offender per cooldown window, not per blocked message
+    const last = lastFloodLog.get(key) ?? 0;
+    if (now - last > FLOOD_LOG_COOLDOWN_MS) {
+      lastFloodLog.set(key, now);
+      db.logModEvent(key, "flood", "rate-limit", "message burst exceeded");
+    }
     return false;
   }
   b.tokens -= 1;
@@ -132,10 +140,40 @@ export function canJoinQueue(key: string): boolean {
   const now = Date.now();
   const b = buckets.get(key) ?? { tokens: MESSAGE_BURST_CAPACITY, updated: now, joinTimes: [] };
   b.joinTimes = b.joinTimes.filter((t) => now - t < 60_000);
+  b.updated = now;
   buckets.set(key, b);
   if (b.joinTimes.length >= 3) return false;
   b.joinTimes.push(now);
   return true;
+}
+
+/**
+ * Janitor — prunes idle state so long-running processes don't leak memory:
+ * buckets/repeat-buffers unused for 10 min, warn-once sets capped at 10k users.
+ */
+let janitorTimer: ReturnType<typeof setInterval> | null = null;
+
+function sweep(): void {
+  const cutoff = Date.now() - BUCKET_TTL_MS;
+  for (const [key, b] of buckets) {
+    if (b.updated < cutoff) buckets.delete(key);
+  }
+  for (const key of recentBodies.keys()) {
+    if (!buckets.has(key)) recentBodies.delete(key);
+  }
+  if (warnedOnce.size > 10_000) warnedOnce.clear();
+  if (lastFloodLog.size > 10_000) lastFloodLog.clear();
+}
+
+export function startModerationJanitor(): void {
+  if (janitorTimer) return;
+  janitorTimer = setInterval(sweep, 5 * 60_000);
+  janitorTimer.unref?.();
+}
+
+export function stopModerationJanitor(): void {
+  if (janitorTimer) clearInterval(janitorTimer);
+  janitorTimer = null;
 }
 
 /** account-level gate: restricted/banned users can't match */

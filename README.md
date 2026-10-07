@@ -16,7 +16,7 @@
 - **Auth** — Google OAuth + email/password via [Supabase Auth](https://supabase.com) when configured, with a zero-setup **demo auth** fallback
 - **Safety by default** — link filtering, anonymous reporting, age bracket only (no birthdays), content guidelines
 
-> **Note on the live layer:** this build ships as a static frontend. The stranger queue, presence and chat partners are a local simulation engine (`src/engine.ts` + personas in `src/data.ts`) behind a clean matching interface — swap it for a WebSocket matching service + database to go fully live without touching the UI.
+> **Note on the live layer:** the app ships with two modes. Without `VITE_SERVER_URL` it runs as a static frontend backed by a local simulation engine (`src/engine.ts`). Set `VITE_SERVER_URL` (or use the Docker image, which serves both) to switch matching + chat to **real people** via the bundled server (`server/`) — Fastify REST + Socket.IO matching/chat/moderation with SQLite persistence through Node's built-in `node:sqlite` (zero native dependencies).
 
 ---
 
@@ -24,10 +24,44 @@
 
 ```bash
 npm install
-npm run dev        # http://localhost:3000
+npm run dev        # http://localhost:3000 — demo simulation mode
 ```
 
 The app runs immediately in **demo auth** mode — no keys, no server, no signup friction. Create an account with any email/password, or continue as guest.
+
+## Run the live server (real people, real-time)
+
+```bash
+cd server
+npm install
+npm run dev        # REST + websockets on http://localhost:8787
+```
+
+Then start the frontend pointed at it:
+
+```bash
+# repo root, .env:
+VITE_SERVER_URL=http://localhost:8787
+npm run dev
+```
+
+Verify the full pipeline (profile → match → chat → connect) against a running server:
+
+```bash
+cd server && npm run smoke
+```
+
+Server environment variables: see `.env.example`. Highlights — `CLIENT_ORIGIN` (allowed browser origins), `SUPABASE_JWT_SECRET` (enables real token verification; empty = demo tokens for local dev only), `ADMIN_TOKEN` (enables `/admin/*`), `STATIC_DIR` (serve a built frontend from the same process), `TRUST_PROXY`, `DATABASE_PATH`.
+
+## One-container deploy (Docker)
+
+Builds the SPA and server, serves everything from one Node 24 process on :8787 — same-origin websockets, no CORS juggling:
+
+```bash
+docker compose up --build     # → http://localhost:8787
+```
+
+Data persists in the `strangrloop-data` volume; healthchecks hit `/health`.
 
 ## Environment variables
 
@@ -37,6 +71,7 @@ All config lives in `.env` (copy `.env.example`):
 | ---------------------- | -------- | -------------------------------------------------------------- |
 | `VITE_APP_NAME`        | no       | Display name (default `StrangrLoop`)                           |
 | `VITE_APP_URL`         | no       | Public URL, used as the OAuth redirect target                  |
+| `VITE_SERVER_URL`      | no       | Live server URL — switches matching/chat from simulation to real people |
 | `VITE_SUPABASE_URL`    | optional | Enables real auth (Google OAuth + email/password)              |
 | `VITE_SUPABASE_ANON_KEY` | optional | Enables real auth                                            |
 | `VITE_ENABLE_DEMO_AUTH`| no       | `true` (default) allows browser-local demo accounts & guest mode |
@@ -65,13 +100,11 @@ All config lives in `.env` (copy `.env.example`):
 npm run build      # outputs static site to dist/
 ```
 
-The build is a plain static SPA — host `dist/` anywhere:
+**Option A — full stack (recommended):** `docker compose up --build` serves the SPA + API + websockets from one container on :8787.
 
-- **Vercel:** import the repo, framework preset "Vite", add the `VITE_*` env vars in the dashboard. Done.
-- **Netlify:** build command `npm run build`, publish directory `dist`, add env vars under Site settings → Environment.
-- **GitHub Pages / S3 / any static host:** upload `dist/`.
+**Option B — static frontend only:** host `dist/` anywhere (Vercel / Netlify / GitHub Pages — the included workflow deploys to Pages on push to `main`) and run `server/` separately; set `VITE_SERVER_URL` at build time to its public URL and add that origin to the server's `CLIENT_ORIGIN`.
 
-Remember to set `VITE_APP_URL` to the deployed origin so Google OAuth redirects land correctly.
+Remember to set `VITE_APP_URL` to the deployed origin so Google OAuth redirects land correctly. For production auth, set `SUPABASE_JWT_SECRET` on the server so tokens are actually verified — demo-token mode is for local development only.
 
 ## Push to GitHub
 
@@ -96,25 +129,39 @@ git push -u origin main
 ## Project structure
 
 ```
-src/
+src/                  # frontend (React + Vite + Tailwind 4)
   config.ts            # env-driven app configuration
   auth.ts              # Supabase Auth + demo fallback (single API)
   types.ts             # shared types
   data.ts              # interests, personas, starters, guidelines
-  engine.ts            # matching algorithm + conversation simulation
-  store.tsx            # global state + persistence + auth subscription
+  engine.ts            # local matching simulation (demo mode)
+  live.ts              # live-server socket layer (real mode)
+  store.tsx            # per-user persisted global state + auth subscription
   components/
-    ui.tsx             # icon set, logo, modal, toasts, confetti…
+    ui.tsx             # icon set, logo, modal, toasts…
     PrefsEditor.tsx    # shared matching-preferences editor
   screens/
     Auth.tsx           # sign in / sign up / Google / guest
     Onboarding.tsx     # age gate → identity → languages → interests → prefs
-    Home.tsx           # matching console + live queue board
+    Home.tsx           # matching console + queue board
     MatchFlow.tsx      # searching radar + "you're connected"
     Chat.tsx           # chat, next, connect, report, block
     Connections.tsx    # mutual connections
     Profile.tsx        # editable identity
     Settings.tsx       # prefs, notifications, privacy, session, delete
+
+server/               # live backend (Fastify + Socket.IO + node:sqlite)
+  src/
+    index.ts           # bootstrap, static SPA serving, graceful shutdown
+    config.ts          # env config + wire types shared with the client
+    db.ts              # SQLite persistence (WAL) — zero native deps
+    auth.ts            # bearer-token identity (Supabase JWT or demo)
+    matching.ts        # scoring engine + queue + fallback ladder
+    moderation.ts      # content rules, rate limits, anti-abuse janitor
+    sockets.ts         # realtime: queue, chat relay, connect, reports
+    routes.ts          # REST: profile, connections, blocks, reports, admin
+  scripts/
+    smoke.mjs          # end-to-end lifecycle test (`npm run smoke`)
 ```
 
 ## Roadmap (designed for, not built)

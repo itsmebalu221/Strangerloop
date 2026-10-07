@@ -1,10 +1,11 @@
 /**
- * Persistence layer — SQLite (better-sqlite3) in WAL mode.
- * Zero-config: creates ./strangrloop.db on first run.
+ * Persistence layer — SQLite via Node's built-in `node:sqlite` (DatabaseSync).
+ * Zero native dependencies: no node-gyp, no prebuilt binaries, installs clean
+ * on any Node >= 22.5 (recommended >= 24 LTS). WAL mode for concurrent reads.
  * Swap for Postgres later by reimplementing this module; the rest of the
  * server only talks to these functions.
  */
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DB_PATH } from "./config.js";
@@ -12,9 +13,9 @@ import type { AgeRange, Gender, Prefs, PublicProfile } from "./config.js";
 
 mkdirSync(dirname(DB_PATH), { recursive: true });
 
-export const db = new Database(DB_PATH);
-db.pragma("journal_mode = WAL");
-db.pragma("foreign_keys = ON");
+export const db = new DatabaseSync(DB_PATH);
+db.exec("PRAGMA journal_mode = WAL;");
+db.exec("PRAGMA foreign_keys = ON;");
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS users (
@@ -141,7 +142,7 @@ const stmt = {
   `),
   removeBlock: db.prepare(`DELETE FROM blocks WHERE blocker = ? AND blocked = ?`),
   listBlocks: db.prepare(`SELECT blocked, reason, created_at FROM blocks WHERE blocker = ? ORDER BY created_at DESC`),
-  isBlocked: db.prepare(`SELECT 1 FROM blocks WHERE (blocker = ? AND blocked = ?) OR (blocker = ? AND blocked = ?) LIMIT 1`),
+  isBlocked: db.prepare(`SELECT 1 AS hit FROM blocks WHERE (blocker = ? AND blocked = ?) OR (blocker = ? AND blocked = ?) LIMIT 1`),
 
   insertReport: db.prepare(`
     INSERT INTO reports (reporter, reported, reason, details, severity, session_id, created_at)
@@ -178,7 +179,8 @@ export interface UserRow {
 
 function parseList(v: string): string[] {
   try {
-    return JSON.parse(v) as string[];
+    const parsed: unknown = JSON.parse(v);
+    return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === "string") : [];
   } catch {
     return [];
   }
@@ -189,7 +191,7 @@ export function ensureUser(id: string, name: string): void {
 }
 
 export function getUser(id: string): UserRow | undefined {
-  return stmt.getUser.get(id) as UserRow | undefined;
+  return stmt.getUser.get(id) as unknown as UserRow | undefined;
 }
 
 export function toPublic(row: UserRow): PublicProfile {
@@ -209,7 +211,7 @@ export function toPublic(row: UserRow): PublicProfile {
 export function getPrefs(row: UserRow): Prefs | null {
   try {
     const p = JSON.parse(row.prefs) as Prefs;
-    return p && Array.isArray(p.agePref) ? p : null;
+    return p && Array.isArray(p.agePref) && Array.isArray(p.conversationTypes) ? p : null;
   } catch {
     return null;
   }
@@ -254,13 +256,13 @@ export function logMessage(sid: string, sender: string, body: string, risk: stri
 }
 
 export function sessionContext(sid: string): { sender_id: string; body: string; risk: string; created_at: number }[] {
-  return stmt.sessionContext.all(sid) as never[];
+  return stmt.sessionContext.all(sid) as unknown as { sender_id: string; body: string; risk: string; created_at: number }[];
 }
 
 export function matchedToday(): number {
   const start = new Date();
   start.setHours(0, 0, 0, 0);
-  return (stmt.matchedToday.get(start.getTime()) as { n: number }).n;
+  return Number((stmt.matchedToday.get(start.getTime()) as unknown as { n: number }).n);
 }
 
 export function connectUsers(a: string, b: string): void {
@@ -269,10 +271,10 @@ export function connectUsers(a: string, b: string): void {
 }
 
 export function listConnections(userId: string) {
-  const rows = stmt.listConnections.all(userId, userId, userId) as { id: number; created_at: number; peer_id: string }[];
+  const rows = stmt.listConnections.all(userId, userId, userId) as unknown as { id: number; created_at: number; peer_id: string }[];
   return rows.map((r) => {
     const peer = getUser(r.peer_id);
-    return { id: r.id, createdAt: r.created_at, peer: peer ? toPublic(peer) : { id: r.peer_id, name: "former user" } };
+    return { id: Number(r.id), createdAt: Number(r.created_at), peer: peer ? toPublic(peer) : { id: r.peer_id, name: "former user" } };
   });
 }
 
@@ -289,7 +291,7 @@ export function unblockUser(blocker: string, blocked: string): void {
 }
 
 export function listBlocks(userId: string) {
-  return stmt.listBlocks.all(userId) as { blocked: string; reason: string; created_at: number }[];
+  return stmt.listBlocks.all(userId) as unknown as { blocked: string; reason: string; created_at: number }[];
 }
 
 export function isBlockedEither(a: string, b: string): boolean {
@@ -302,15 +304,21 @@ export function insertReport(r: { reporter: string; reported: string; reason: st
 }
 
 export function listReports() {
-  return stmt.listReports.all() as never[];
+  return stmt.listReports.all() as unknown as Record<string, unknown>[];
 }
 
 export function setReportStatus(id: number, status: string): void {
   stmt.setReportStatus.run(status, id);
 }
 
+/** Escape LIKE wildcards so user input can't scan the whole table. */
+function escapeLike(q: string): string {
+  return q.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
 export function searchUsers(q: string) {
-  return stmt.searchUsers.all(`%${q}%`) as never[];
+  const term = `%${escapeLike(q.trim().slice(0, 40))}%`;
+  return stmt.searchUsers.all(term) as unknown as Record<string, unknown>[];
 }
 
 export function logModEvent(user: string, kind: string, category: string, detail: string): void {

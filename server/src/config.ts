@@ -4,14 +4,21 @@
  */
 const env = process.env;
 
-export const PORT = Number(env.PORT ?? 8787);
+const portNum = Number(env.PORT);
+export const PORT = Number.isFinite(portNum) && portNum > 0 ? portNum : 8787;
 export const HOST = env.HOST ?? "0.0.0.0";
+/** Set to a built frontend directory (e.g. ../dist) to serve the SPA from this server. */
+export const STATIC_DIR = env.STATIC_DIR?.trim() ?? "";
+/** Enable when running behind a reverse proxy that sets X-Forwarded-* headers. */
+export const TRUST_PROXY = env.TRUST_PROXY === "true";
 
-/** Comma-separated origins allowed for CORS + socket handshake. */
+/** Comma-separated origins allowed for CORS + socket handshake ("*" allows any). */
 export const CLIENT_ORIGINS = (env.CLIENT_ORIGIN ?? "http://localhost:3000,http://localhost:5173,http://localhost:4173")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
+
+export const ALLOW_ALL_ORIGINS = CLIENT_ORIGINS.includes("*");
 
 export const DB_PATH = env.DATABASE_PATH ?? "./strangrloop.db";
 

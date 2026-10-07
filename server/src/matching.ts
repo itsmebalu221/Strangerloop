@@ -29,6 +29,38 @@ let pairingTimer: ReturnType<typeof setInterval> | null = null;
 let onPair: ((entryA: QueueEntry, entryB: QueueEntry, matchA: LiveMatch, matchB: LiveMatch) => void) | null = null;
 
 /* ================= scoring ================= */
+const AGES: readonly string[] = ["18–24", "25–34", "35–44", "45+"];
+const GENDER_PREFS: readonly string[] = ["anyone", "male", "female", "other"];
+
+function strList(v: unknown, cap: number): string[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .filter((x): x is string => typeof x === "string")
+    .map((x) => x.trim().slice(0, 32))
+    .filter(Boolean)
+    .slice(0, cap);
+}
+
+/**
+ * Coerce untrusted client input into a valid Prefs object. Malformed prefs
+ * must never reach the scoring engine — one bad shape used to crash the
+ * shared pairing loop (`conversationTypes.some is not a function`).
+ */
+export function sanitizePrefs(input: unknown, fallback: Prefs): Prefs {
+  if (!input || typeof input !== "object") return fallback;
+  const p = input as Partial<Prefs>;
+  const agePref = Array.isArray(p.agePref) ? p.agePref.filter((a): a is Prefs["agePref"][number] => typeof a === "string" && AGES.includes(a)) : [];
+  const languages = strList(p.languages, 16);
+  const conversationTypes = strList(p.conversationTypes, 12);
+  const genderPref = typeof p.genderPref === "string" && GENDER_PREFS.includes(p.genderPref) ? p.genderPref : fallback.genderPref;
+  return {
+    genderPref,
+    agePref: agePref.length > 0 ? agePref : fallback.agePref,
+    languages: languages.length > 0 ? languages : fallback.languages,
+    conversationTypes: conversationTypes.length > 0 ? conversationTypes : fallback.conversationTypes,
+  };
+}
+
 function sharedInterests(a: string[], b: string[]): string[] {
   const set = new Set(b);
   return a.filter((x) => set.has(x));
@@ -164,31 +196,36 @@ function finalizePair(a: QueueEntry, b: QueueEntry, matchA: LiveMatch, matchB: L
 
 /** periodic sweep: longest-waiting users get paired first */
 function pairingPass(): void {
-  const waiters = [...queue.values()].sort((x, y) => x.since - y.since);
-  const used = new Set<string>();
+  try {
+    const waiters = [...queue.values()].sort((x, y) => x.since - y.since);
+    const used = new Set<string>();
 
-  for (const a of waiters) {
-    if (used.has(a.userId)) continue;
-    const level = allowedLevel(Date.now() - a.since);
-    let best: { entry: QueueEntry; score: number } | null = null;
+    for (const a of waiters) {
+      if (used.has(a.userId)) continue;
+      const level = allowedLevel(Date.now() - a.since);
+      let best: { entry: QueueEntry; score: number } | null = null;
 
-    for (const b of waiters) {
-      if (b.userId === a.userId || used.has(b.userId)) continue;
-      if (db.isBlockedEither(a.userId, b.userId)) continue;
-      const bLevel = allowedLevel(Date.now() - b.since);
-      const lvl = Math.max(level, bLevel);
-      if (!eligible(a, b, lvl) || !eligible(b, a, lvl)) continue;
-      const { score } = computeScore(a, b);
-      if (!best || score > best.score) best = { entry: b, score };
+      for (const b of waiters) {
+        if (b.userId === a.userId || used.has(b.userId)) continue;
+        if (db.isBlockedEither(a.userId, b.userId)) continue;
+        const bLevel = allowedLevel(Date.now() - b.since);
+        const lvl = Math.max(level, bLevel);
+        if (!eligible(a, b, lvl) || !eligible(b, a, lvl)) continue;
+        const { score } = computeScore(a, b);
+        if (!best || score > best.score) best = { entry: b, score };
+      }
+
+      if (best) {
+        used.add(a.userId);
+        used.add(best.entry.userId);
+        const lvl = Math.max(level, allowedLevel(Date.now() - best.entry.since));
+        const { matchA, matchB } = buildMatches(a, best.entry, lvl);
+        finalizePair(a, best.entry, matchA, matchB);
+      }
     }
-
-    if (best) {
-      used.add(a.userId);
-      used.add(best.entry.userId);
-      const lvl = Math.max(level, allowedLevel(Date.now() - best.entry.since));
-      const { matchA, matchB } = buildMatches(a, best.entry, lvl);
-      finalizePair(a, best.entry, matchA, matchB);
-    }
+  } catch (err) {
+    // never let one bad queue entry kill the interval for everyone
+    console.error("[pairing] pass failed:", err);
   }
 }
 

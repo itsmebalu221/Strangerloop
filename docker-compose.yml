@@ -1,0 +1,28 @@
+# StrangrLoop — full stack in one container (SPA + REST + websockets).
+#
+#   docker compose up --build     → http://localhost:8787
+#
+# For a public deployment set CLIENT_ORIGIN to your site origin and put a
+# TLS-terminating proxy (Caddy/Traefik/nginx) in front with TRUST_PROXY=true.
+
+services:
+  app:
+    build: .
+    ports:
+      - "${PORT:-8787}:8787"
+    environment:
+      PORT: 8787
+      # comma-separated browser origins allowed to talk to the API
+      CLIENT_ORIGIN: ${CLIENT_ORIGIN:-http://localhost:3000,http://localhost:8787}
+      TRUST_PROXY: ${TRUST_PROXY:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      # ── auth: leave SUPABASE_JWT_SECRET empty for demo auth (dev only) ──
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-}
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+    volumes:
+      - strangrloop-data:/data
+    restart: unless-stopped
+
+volumes:
+  strangrloop-data:

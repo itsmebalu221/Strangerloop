@@ -24,17 +24,17 @@ const NAV: { id: View; label: string; icon: IconName }[] = [
 ];
 
 function Shell() {
-  const { profile, flow, view, setView, connections, stats, authUser, authReady } = useStore();
+  const { profile, flow, view, setView, connections, stats, authUser, authReady, hydrated } = useStore();
   const [liveStats, setLiveStats] = useState<LiveStats | null>(null);
 
   useEffect(() => {
     if (!LIVE_ENABLED) return;
     const off = onLiveStats(setLiveStats);
-    void getLiveSocket();
+    void getLiveSocket().catch(() => setLiveStats(null));
     return off;
   }, []);
 
-  if (!authReady) return <Boot />;
+  if (!authReady || !hydrated) return <Boot />;
   if (!authUser) return <AuthScreen />;
   if (!profile) return <Onboarding />;
 
@@ -70,7 +70,11 @@ function Shell() {
             ))}
           </nav>
           <div className="hidden sm:block">
-            <OnlinePill count={liveStats ? liveStats.online : 1287 + Math.round(Math.sin(stats.chats) * 40)} />
+            {liveStats ? (
+              <OnlinePill count={liveStats.online} />
+            ) : (
+              <span className="chip chip-static text-xs">local mode</span>
+            )}
           </div>
         </div>
       </header>
@@ -98,7 +102,9 @@ function Shell() {
           </div>
         </div>
         <p className="text-center text-[0.7rem] font-mono text-moss pb-5">
-          demo build — stranger conversations are simulated locally · random chat → connections → groups → communities → forum
+          {LIVE_ENABLED
+            ? "live build — matching and chat run on the strangrloop server · random chat → connections → groups → communities → forum"
+            : "demo build — stranger conversations are simulated locally · random chat → connections → groups → communities → forum"}
         </p>
       </footer>
 

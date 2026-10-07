@@ -31,28 +31,35 @@ export function Searching() {
     /* live mode — join the server queue; a real match arrives over the socket */
     if (LIVE_ENABLED) {
       let cancelled = false;
-      void getLiveSocket().then((s) => {
-        if (cancelled) return;
-        const onFound = (m: LiveMatch) => {
-          if (!cancelled) setFlow({ stage: "chat", live: m });
-        };
-        const onError = (e: { message?: string }) => {
+      const onFound = (m: LiveMatch) => {
+        if (!cancelled) setFlow({ stage: "chat", live: m });
+      };
+      const onError = (e: { message?: string }) => {
+        if (!cancelled) {
+          toast(e.message ?? "Couldn't join the matching queue.", "warn");
+          setFlow({ stage: "idle" });
+        }
+      };
+      void getLiveSocket()
+        .then((s) => {
+          if (cancelled) return;
+          s.on("match:found", onFound);
+          s.on("queue:error", onError);
+          s.emit("queue:join", { prefs });
+        })
+        .catch(() => {
           if (!cancelled) {
-            toast(e.message ?? "Couldn't join the matching queue.", "warn");
+            toast("Couldn't reach the live server.", "warn");
             setFlow({ stage: "idle" });
           }
-        };
-        s.on("match:found", onFound);
-        s.on("queue:error", onError);
-        s.emit("queue:join", { prefs });
-      });
+        });
       return () => {
         cancelled = true;
         window.clearInterval(stageTimer);
         const s = liveSocket();
         if (s) {
-          s.off("match:found");
-          s.off("queue:error");
+          s.off("match:found", onFound);
+          s.off("queue:error", onError);
           s.emit("queue:leave");
         }
       };
@@ -61,6 +68,11 @@ export function Searching() {
     /* simulation mode */
     const matchTimer = window.setTimeout(() => {
       const match = pickStranger(profile, prefs, blocked.map((b) => b.personaId));
+      if (!match) {
+        toast("You've blocked everyone in the pool — unblock a few in Settings to keep matching.", "warn");
+        setFlow({ stage: "idle" });
+        return;
+      }
       setFlow({ stage: "intro", match });
     }, searchDuration());
 

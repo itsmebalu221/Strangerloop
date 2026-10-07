@@ -26,6 +26,11 @@ const supabase = SUPABASE_CONFIGURED
 export const authMode = SUPABASE_CONFIGURED ? ("supabase" as const) : ("demo" as const);
 export const googleSignInAvailable = SUPABASE_CONFIGURED;
 
+/** Shared Supabase client for modules that need session tokens (e.g. live.ts). */
+export function getSupabase() {
+  return supabase;
+}
+
 /* ================= supabase mapping ================= */
 function mapSupaUser(u: {
   id: string;

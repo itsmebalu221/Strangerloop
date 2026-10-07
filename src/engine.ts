@@ -39,14 +39,14 @@ export function scorePersona(profile: Profile, prefs: Prefs, persona: Persona): 
   return { persona, shared, sharedConv, sharedLang, score, pct: Math.round((score / 140) * 100), level };
 }
 
-export function pickStranger(profile: Profile, prefs: Prefs, blockedIds: string[]): MatchResult {
+export function pickStranger(profile: Profile, prefs: Prefs, blockedIds: string[]): MatchResult | null {
   const candidates = POOL.filter((p) => !blockedIds.includes(p.id));
+  if (candidates.length === 0) return null;
   const scored = candidates.map((p) => scorePersona(profile, prefs, p));
   scored.sort((a, b) => b.score - a.score);
   // slight randomness among the top tier so repeats feel fresh
   const top = scored.slice(0, Math.min(3, scored.length));
-  const weighted = Math.random() < 0.6 ? top[0] : pick(top);
-  return weighted;
+  return Math.random() < 0.6 ? top[0] : pick(top);
 }
 
 export function queueCandidates(profile: Profile, prefs: Prefs, blockedIds: string[], count = 5): MatchResult[] {
@@ -78,10 +78,9 @@ export function startersFor(match: MatchResult): string[] {
   const fromShared = match.shared
     .flatMap((id) => STARTERS.find((s) => s.interest === id)?.starters ?? [])
     .slice(0, 2);
-  const extras = pick([GENERIC_STARTERS, GENERIC_STARTERS]);
   const set = [...fromShared];
   while (set.length < 3) {
-    const g = pick(extras);
+    const g = pick(GENERIC_STARTERS);
     if (!set.includes(g)) set.push(g);
   }
   return set.slice(0, 3);
