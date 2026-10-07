@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GENERIC_STARTERS, GUIDELINES, REPORT_REASONS, STARTERS, countryFlag, interestById } from "../data";
 import { acceptProbability, greeting, makeReply, replyDelay, startersFor } from "../engine";
-import { liveSocket } from "../live";
+import { fetchLiveConnections, liveSocket } from "../live";
 import { useStore } from "../store";
 import type { ChatMsg, LiveMatch, MatchResult, Persona } from "../types";
 import { Avatar, Icon, Modal } from "../components/ui";
@@ -157,6 +157,24 @@ export default function Chat({ match, live }: { match?: MatchResult; live?: Live
       if (disposed || e.sessionId !== sessionId) return;
       doConnectSuccess(false);
       toast(`🎉 You and ${p.name} connected!`, "success");
+      // persist from the server as the source of truth
+      void fetchLiveConnections()
+        .then((rows) => {
+          const row = rows.find((r) => r.peer.id === p.id);
+          if (!row) return;
+          addConnection({
+            id: `lc-${row.id}`,
+            personaId: row.peer.id,
+            name: row.peer.name,
+            flag: countryFlag(row.peer.country),
+            country: row.peer.country,
+            interests: row.peer.interests,
+            shared: sharedIds,
+            metAt: row.createdAt,
+            color: "#2FBF8F",
+          });
+        })
+        .catch(() => undefined);
     };
     const onBlocked = () => {
       if (disposed) return;

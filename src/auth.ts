@@ -142,6 +142,20 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   return s ? toAuthUser(s) : null;
 }
 
+/**
+ * Bearer token for the live server (sockets + REST).
+ *  • supabase mode → the Supabase access token (JWT, verified server-side)
+ *  • demo mode     → "demo:<userId>" accepted by the server in dev
+ */
+export async function getAuthToken(): Promise<string | undefined> {
+  if (supabase) {
+    const { data } = await supabase.auth.getSession();
+    return data.session?.access_token ?? undefined;
+  }
+  const s = readSession();
+  return s ? `demo:${s.id}` : undefined;
+}
+
 export function onAuthChange(cb: (u: AuthUser | null) => void): () => void {
   if (supabase) {
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {

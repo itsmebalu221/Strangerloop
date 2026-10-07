@@ -5,7 +5,7 @@ import { LIVE_ENABLED } from "../config";
 import { getLiveSocket, onLiveStats } from "../live";
 import { useStore } from "../store";
 import type { LiveStats, Persona, Prefs } from "../types";
-import { Avatar, Icon, Reveal, Squiggle } from "../components/ui";
+import { Avatar, Icon, OnlinePill, Reveal, Squiggle } from "../components/ui";
 import PrefsEditor from "../components/PrefsEditor";
 
 interface QueueRow {
@@ -17,6 +17,7 @@ export default function Home() {
   const { profile, prefs, setPrefs, blocked, setFlow, setView, stats, toast } = useStore();
   const [prefsOpen, setPrefsOpen] = useState(false);
   const [draft, setDraft] = useState<Prefs>(prefs);
+  const [liveStats, setLiveStats] = useState<LiveStats | null>(null);
 
   /* ---------- live world simulation ---------- */
   const [rows, setRows] = useState<QueueRow[]>(() =>
@@ -24,7 +25,6 @@ export default function Home() {
   );
   const [online, setOnline] = useState(1287);
   const [matchesToday, setMatchesToday] = useState(48213);
-  const [liveStats, setLiveStats] = useState<LiveStats | null>(null);
   const tickRef = useRef(0);
 
   useEffect(() => {
@@ -156,12 +156,23 @@ export default function Home() {
                   <span className="relative inline-flex rounded-full w-2 h-2 bg-mint" />
                 </span>
                 {liveStats ? "LIVE — searching right now" : "SIMULATED — demo activity"}
+                {liveStats ? "LIVE — searching right now" : "SIMULATED — demo activity"}
               </span>
-              <span className="font-mono text-xs text-paper/70">{queueCount} in queue</span>
+              <span className="font-mono text-xs text-paper/70">{LIVE_ENABLED && liveStats ? `${liveStats.searching} in queue` : `${queueCount} in queue`}</span>
             </div>
 
             <div className="divide-y divide-ink/8">
-              {rows.map((r, i) => (
+              {LIVE_ENABLED ? (
+                <div className="px-5 py-7 text-center">
+                  <p className="font-bold text-sm mb-1.5">
+                    {liveStats
+                      ? `${liveStats.online.toLocaleString()} online · ${liveStats.searching} searching · ${liveStats.activeChats} chats active`
+                      : "Connecting to the live server…"}
+                  </p>
+                  <p className="text-xs font-semibold text-fern">Matches come from the real queue — hit FIND SOMEONE to join it.</p>
+                </div>
+              ) : (
+              rows.map((r, i) => (
                 <div key={r.persona.id} className="flex items-center gap-3.5 px-5 py-3.5">
                   <Avatar name={r.persona.name} color={["#FF4B2E", "#2FBF8F", "#FFC24B", "#5B8DEF", "#E2618E"][i % 5]} size={38} />
                   <div className="min-w-0 flex-1">
@@ -176,7 +187,8 @@ export default function Home() {
                   </div>
                   <span className="font-mono text-xs text-moss whitespace-nowrap">{Math.floor(r.secs / 60)}:{String(r.secs % 60).padStart(2, "0")}</span>
                 </div>
-              ))}
+              ))
+              )}
             </div>
 
             {/* metrics */}
@@ -184,7 +196,7 @@ export default function Home() {
               {[
                 { label: "Online", value: shownOnline.toLocaleString() },
                 { label: "Matches today", value: shownMatches.toLocaleString() },
-                { label: "Median match", value: "3.8s" },
+                { label: LIVE_ENABLED ? "In queue" : "Median match", value: LIVE_ENABLED ? String(liveStats?.searching ?? 0) : "3.8s" },
               ].map((m) => (
                 <div key={m.label} className="px-4 py-3 text-center">
                   <p className="font-mono text-[1.05rem] font-medium leading-none">{m.value}</p>
