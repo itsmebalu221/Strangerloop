@@ -93,6 +93,7 @@ CREATE TABLE IF NOT EXISTS moderation_events (
   created_at  INTEGER NOT NULL
 );
 `);
+db.exec("CREATE INDEX IF NOT EXISTS idx_blocks_blocked ON blocks(blocked);");
 
 /* ================= prepared statements ================= */
 const stmt = {
@@ -143,6 +144,7 @@ const stmt = {
   removeBlock: db.prepare(`DELETE FROM blocks WHERE blocker = ? AND blocked = ?`),
   listBlocks: db.prepare(`SELECT blocked, reason, created_at FROM blocks WHERE blocker = ? ORDER BY created_at DESC`),
   isBlocked: db.prepare(`SELECT 1 AS hit FROM blocks WHERE (blocker = ? AND blocked = ?) OR (blocker = ? AND blocked = ?) LIMIT 1`),
+  blockedPeers: db.prepare(`SELECT blocked AS peer FROM blocks WHERE blocker = ? UNION SELECT blocker AS peer FROM blocks WHERE blocked = ?`),
 
   insertReport: db.prepare(`
     INSERT INTO reports (reporter, reported, reason, details, severity, session_id, created_at)
@@ -251,8 +253,8 @@ export function endSession(id: string, reason: string): void {
   stmt.endSession.run({ id, now: Date.now(), reason });
 }
 
-export function logMessage(sid: string, sender: string, body: string, risk: string): void {
-  stmt.insertMessage.run({ sid, sender, body, risk, now: Date.now() });
+export function logMessage(sid: string, sender: string, body: string, risk: string): string {
+  return String(stmt.insertMessage.run({ sid, sender, body, risk, now: Date.now() }).lastInsertRowid);
 }
 
 export function sessionContext(sid: string): { sender_id: string; body: string; risk: string; created_at: number }[] {
@@ -296,6 +298,11 @@ export function listBlocks(userId: string) {
 
 export function isBlockedEither(a: string, b: string): boolean {
   return Boolean(stmt.isBlocked.get(a, b, b, a));
+}
+
+export function blockedPeers(userId: string): Set<string> {
+  const rows = stmt.blockedPeers.all(userId, userId) as unknown as { peer: string }[];
+  return new Set(rows.map((row) => row.peer));
 }
 
 export function insertReport(r: { reporter: string; reported: string; reason: string; details: string; severity: string; session: string | null }): number {

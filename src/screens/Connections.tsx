@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { interestById } from "../data";
+import { countryFlag, interestById } from "../data";
+import { LIVE_ENABLED } from "../config";
+import { fetchLiveConnections, liveRest } from "../live";
 import { useStore } from "../store";
 import type { Connection } from "../types";
 import { Avatar, Icon, Reveal } from "../components/ui";
@@ -15,13 +17,14 @@ const timeAgo = (t: number) => {
 };
 
 export default function Connections() {
-  const { connections, removeConnection, toast } = useStore();
+  const { connections, addConnection, removeConnection, toast, authUser } = useStore();
   const [onlineSet, setOnlineSet] = useState<Set<string>>(new Set());
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [breakerFor, setBreakerFor] = useState<string | null>(null);
 
   /* simulated presence — some connections drift online/offline */
   useEffect(() => {
+    if (LIVE_ENABLED) return;
     const roll = () => {
       const next = new Set<string>();
       connections.forEach((c) => {
@@ -33,6 +36,33 @@ export default function Connections() {
     const t = window.setInterval(roll, 8000);
     return () => window.clearInterval(t);
   }, [connections]);
+
+  useEffect(() => {
+    if (!LIVE_ENABLED) return;
+    let disposed = false;
+    void fetchLiveConnections().then((rows) => {
+      if (disposed) return;
+      for (const saved of connections) {
+        if (!rows.some((row) => row.peer.id === saved.personaId)) removeConnection(saved.id);
+      }
+      for (const row of rows) addConnection({
+        id: `lc-${row.id}`, personaId: row.peer.id, name: row.peer.name,
+        flag: countryFlag(row.peer.country), country: row.peer.country,
+        interests: row.peer.interests, shared: [], metAt: row.createdAt, color: "#2FBF8F",
+      });
+    }).catch(() => { if (!disposed) toast("Couldn't load your live connections.", "warn"); });
+    return () => { disposed = true; };
+  }, [authUser?.id]);
+
+  const remove = async (c: Connection) => {
+    if (confirmId !== c.id) { setConfirmId(c.id); return; }
+    try {
+      if (LIVE_ENABLED) await liveRest(`/connections/${encodeURIComponent(c.id.replace(/^lc-/, ""))}`, { method: "DELETE" });
+      removeConnection(c.id);
+      toast(`${c.name} removed from your connections.`, "info");
+      setConfirmId(null);
+    } catch { toast("Couldn't remove this connection. Try again.", "warn"); }
+  };
 
   const sorted = useMemo(() => [...connections].sort((a, b) => b.metAt - a.metAt), [connections]);
 
@@ -90,7 +120,7 @@ export default function Connections() {
                       <Avatar name={c.name} color={c.color} size={52} ring />
                       <span
                         className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-white transition-colors ${isOnline ? "bg-mint" : "bg-moss/60"}`}
-                        title={isOnline ? "Online now" : "Offline"}
+                        title={LIVE_ENABLED ? "Presence unavailable" : isOnline ? "Online now" : "Offline"}
                       />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -98,7 +128,7 @@ export default function Connections() {
                         {c.name} <span className="font-normal">{c.flag}</span>
                       </p>
                       <p className="text-xs font-semibold text-moss">
-                        Met {timeAgo(c.metAt)} · {isOnline ? <span className="text-teal">online now</span> : "offline"}
+                        Met {timeAgo(c.metAt)} · {LIVE_ENABLED ? "saved connection" : isOnline ? <span className="text-teal">online now</span> : "offline"}
                       </p>
                     </div>
                   </div>
@@ -124,12 +154,12 @@ export default function Connections() {
                   </div>
 
                   <div className="relative flex gap-2">
-                    <button className="btn btn-sm flex-1 text-sm" onClick={() => sendIcebreaker(c)}>
-                      <Icon name="bubble" className="w-4 h-4 text-coral" /> Send icebreaker
+                    <button className="btn btn-sm flex-1 text-sm" onClick={() => sendIcebreaker(c)} disabled={LIVE_ENABLED} title={LIVE_ENABLED ? "Direct messaging isn't available yet" : undefined}>
+                      <Icon name="bubble" className="w-4 h-4 text-coral" /> {LIVE_ENABLED ? "Messaging coming soon" : "Send icebreaker"}
                     </button>
                     <button
                       className="btn btn-sm btn-soft-danger text-sm"
-                      onClick={() => (confirmId === c.id ? (removeConnection(c.id), toast(`${c.name} removed from your connections.`, "info"), setConfirmId(null)) : setConfirmId(c.id))}
+                      onClick={() => { void remove(c); }}
                       aria-label={`Remove ${c.name}`}
                     >
                       <Icon name="trash" className={`w-4 h-4 ${confirmId === c.id ? "text-ember" : "text-fern"}`} />

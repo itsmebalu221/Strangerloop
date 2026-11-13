@@ -23,6 +23,7 @@ export interface QueueEntry {
 
 const queue = new Map<string, QueueEntry>();
 const sessions = new Map<string, { a: string; b: string; connectRequests: Set<string> }>();
+const sessionByUser = new Map<string, string>();
 const socketToUser = new Map<string, string>();
 
 let pairingTimer: ReturnType<typeof setInterval> | null = null;
@@ -68,8 +69,8 @@ function sharedInterests(a: string[], b: string[]): string[] {
 
 export function computeScore(a: QueueEntry, b: QueueEntry) {
   const shared = sharedInterests(a.profile.interests, b.profile.interests);
-  const sharedConv = sharedInterests(a.profile.conversationTypes, b.profile.conversationTypes);
-  const lang = a.profile.languages.find((l) => b.profile.languages.includes(l)) ?? null;
+  const sharedConv = sharedInterests(a.prefs.conversationTypes, b.prefs.conversationTypes);
+  const lang = a.profile.languages.find((l) => b.profile.languages.includes(l) && a.prefs.languages.includes(l) && b.prefs.languages.includes(l)) ?? null;
 
   let score = 0;
   score += Math.min(shared.length, 3) * 20;
@@ -104,22 +105,32 @@ function allowedLevel(ms: number): 1 | 2 | 3 | 4 | 5 {
   return 5;
 }
 
-function eligible(a: QueueEntry, b: QueueEntry, level: number): boolean {
-  const { shared, sharedLang } = computeScore(a, b);
+function eligible(a: QueueEntry, b: QueueEntry, level: number, result: ReturnType<typeof computeScore>): boolean {
+  const { shared, sharedLang } = result;
   const genderOk = genderSatisfied(a.prefs.genderPref, b.profile.gender);
   const ageOk = oneWayAge(a, b);
   switch (level) {
     case 1:
-      return genderOk && ageOk && shared.length > 0 && sharedLang !== null && a.prefs.conversationTypes.some((t) => b.profile.conversationTypes.includes(t));
+      return genderOk && ageOk && shared.length > 0 && sharedLang !== null && result.sharedConv.length > 0;
     case 2:
       return genderOk && shared.length > 0 && sharedLang !== null;
     case 3:
       return genderOk && (shared.length > 0 || sharedLang !== null);
     case 4:
-      return sharedLang !== null || genderOk;
+      return sharedLang !== null;
     default:
       return true;
   }
+}
+
+function scoreEligiblePair(a: QueueEntry, b: QueueEntry, levelA: number, levelB: number) {
+  // Cheap preference checks avoid allocating scores for impossible pairs.
+  if (levelA <= 3 && !genderSatisfied(a.prefs.genderPref, b.profile.gender)) return null;
+  if (levelB <= 3 && !genderSatisfied(b.prefs.genderPref, a.profile.gender)) return null;
+  if (levelA === 1 && !oneWayAge(a, b)) return null;
+  if (levelB === 1 && !oneWayAge(b, a)) return null;
+  const result = computeScore(a, b);
+  return eligible(a, b, levelA, result) && eligible(b, a, levelB, result) ? result : null;
 }
 
 /* ================= queue management ================= */
@@ -146,6 +157,10 @@ export function queueSize(): number {
   return queue.size;
 }
 
+export function isQueued(userId: string): boolean {
+  return queue.has(userId);
+}
+
 export function activeSessionCount(): number {
   return sessions.size;
 }
@@ -155,20 +170,26 @@ export function setPairHandler(fn: NonNullable<typeof onPair>): void {
 }
 
 function tryPairNow(fresh: QueueEntry): void {
-  let best: { entry: QueueEntry; matchA: LiveMatch; matchB: LiveMatch; score: number } | null = null;
-  const level = allowedLevel(Date.now() - fresh.since);
+  let best: { entry: QueueEntry; score: number; level: number } | null = null;
+  const now = Date.now();
+  const level = allowedLevel(now - fresh.since);
+  const blocked = db.blockedPeers(fresh.userId);
 
   for (const cand of queue.values()) {
     if (cand.userId === fresh.userId) continue;
-    if (db.isBlockedEither(fresh.userId, cand.userId)) continue;
-    const candLevel = Math.max(level, allowedLevel(Date.now() - cand.since));
-    if (!eligible(fresh, cand, candLevel) || !eligible(cand, fresh, candLevel)) continue;
-    const r = computeScore(fresh, cand);
+    if (blocked.has(cand.userId)) continue;
+    const candLevel = allowedLevel(now - cand.since);
+    const r = scoreEligiblePair(fresh, cand, level, candLevel);
+    if (!r) continue;
     if (!best || r.score > best.score) {
-      best = { entry: cand, score: r.score, ...buildMatches(fresh, cand, candLevel) };
+      best = { entry: cand, score: r.score, level: Math.max(level, candLevel) };
+      if (r.score === 140) break;
     }
   }
-  if (best) finalizePair(fresh, best.entry, best.matchA, best.matchB);
+  if (best) {
+    const { matchA, matchB } = buildMatches(fresh, best.entry, best.level);
+    finalizePair(fresh, best.entry, matchA, matchB);
+  }
 }
 
 function buildMatches(a: QueueEntry, b: QueueEntry, level: number) {
@@ -190,29 +211,34 @@ function finalizePair(a: QueueEntry, b: QueueEntry, matchA: LiveMatch, matchB: L
   socketToUser.delete(a.socketId);
   socketToUser.delete(b.socketId);
   sessions.set(matchA.sessionId, { a: a.userId, b: b.userId, connectRequests: new Set() });
+  sessionByUser.set(a.userId, matchA.sessionId);
+  sessionByUser.set(b.userId, matchA.sessionId);
   db.createSession(matchA.sessionId, a.userId, b.userId, matchA.level, matchA.score);
   onPair?.(a, b, matchA, matchB);
 }
 
 /** periodic sweep: longest-waiting users get paired first */
-function pairingPass(): void {
+export function pairingPass(): void {
   try {
     const waiters = [...queue.values()].sort((x, y) => x.since - y.since);
     const used = new Set<string>();
+    const now = Date.now();
+    const blocked = new Map(waiters.map((entry) => [entry.userId, db.blockedPeers(entry.userId)]));
 
     for (const a of waiters) {
       if (used.has(a.userId)) continue;
-      const level = allowedLevel(Date.now() - a.since);
+      const level = allowedLevel(now - a.since);
       let best: { entry: QueueEntry; score: number } | null = null;
 
       for (const b of waiters) {
         if (b.userId === a.userId || used.has(b.userId)) continue;
-        if (db.isBlockedEither(a.userId, b.userId)) continue;
-        const bLevel = allowedLevel(Date.now() - b.since);
-        const lvl = Math.max(level, bLevel);
-        if (!eligible(a, b, lvl) || !eligible(b, a, lvl)) continue;
-        const { score } = computeScore(a, b);
+        if (blocked.get(a.userId)?.has(b.userId)) continue;
+        const bLevel = allowedLevel(now - b.since);
+        const result = scoreEligiblePair(a, b, level, bLevel);
+        if (!result) continue;
+        const { score } = result;
         if (!best || score > best.score) best = { entry: b, score };
+        if (score === 140) break;
       }
 
       if (best) {
@@ -252,10 +278,19 @@ export function requestConnect(sessionId: string, userId: string): boolean {
 }
 
 export function endChat(sessionId: string, reason: string): void {
-  if (sessions.delete(sessionId)) db.endSession(sessionId, reason);
+  const s = sessions.get(sessionId);
+  if (!s) return;
+  sessions.delete(sessionId);
+  sessionByUser.delete(s.a);
+  sessionByUser.delete(s.b);
+  db.endSession(sessionId, reason);
 }
 
 export function userInSession(userId: string): string | undefined {
-  for (const [id, s] of sessions) if (s.a === userId || s.b === userId) return id;
-  return undefined;
+  return sessionByUser.get(userId);
+}
+
+export function stopPairingLoop(): void {
+  if (pairingTimer) clearInterval(pairingTimer);
+  pairingTimer = null;
 }

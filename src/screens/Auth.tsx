@@ -84,14 +84,14 @@ export default function AuthScreen() {
         </div>
 
         <div className="relative">
-          <p className="mono-label text-amber mb-5">strangrloop.chat · 18+ · moderated</p>
+          <p className="mono-label text-amber mb-5">18+ text chat</p>
           <h1 className="display text-[clamp(2.8rem,4.5vw,4.2rem)] leading-[0.98] mb-6">
-            Random chats.
+            Talk to strangers
             <br />
-            Real <span className="text-amber">connections</span>.
+            <span className="text-amber">online.</span>
           </h1>
           <p className="text-paper/75 font-medium text-lg max-w-md mb-9">
-            Skip the small-talk lottery. We match you with strangers who share your interests — score them on language, age and vibe — then get out of the way.
+            Start a one-on-one text chat and meet someone new. Choose your interests and languages to help find common ground.
           </p>
           <div className="space-y-3 max-w-md">
             {[

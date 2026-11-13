@@ -54,15 +54,15 @@ export function moderate(userId: string, rawBody: string): { verdict: Verdict; b
   const stripped = body.trim();
   if (!stripped) return { verdict: { risk: "low", category: "", reason: "" }, body };
 
-  const capsRatio = stripped.length > 20 ? (stripped.replace(/[^A-Z]/g, "").length / stripped.replace(/[^a-zA-Z]/g, "").length || 0) : 0;
-  if (capsRatio > 0.7 && stripped.length > 25) {
-    return flagged(userId, { risk: "suspicious", category: "spam", reason: "excessive caps" }, body);
-  }
-
   for (const rule of RULES) {
     if (rule.pattern.test(stripped)) {
       return flagged(userId, { risk: rule.risk, category: rule.category, reason: "pattern match" }, body);
     }
+  }
+
+  const capsRatio = stripped.length > 20 ? (stripped.replace(/[^A-Z]/g, "").length / stripped.replace(/[^a-zA-Z]/g, "").length || 0) : 0;
+  if (capsRatio > 0.7 && stripped.length > 25) {
+    return flagged(userId, { risk: "suspicious", category: "spam", reason: "excessive caps" }, body);
   }
 
   // repeated-message flood detection
@@ -135,14 +135,14 @@ export function consumeMessageToken(key: string): boolean {
   return true;
 }
 
-/** max 3 queue joins per minute per user */
+/** Allow normal Next usage while limiting automated queue churn. */
 export function canJoinQueue(key: string): boolean {
   const now = Date.now();
   const b = buckets.get(key) ?? { tokens: MESSAGE_BURST_CAPACITY, updated: now, joinTimes: [] };
   b.joinTimes = b.joinTimes.filter((t) => now - t < 60_000);
   b.updated = now;
   buckets.set(key, b);
-  if (b.joinTimes.length >= 3) return false;
+  if (b.joinTimes.length >= 30) return false;
   b.joinTimes.push(now);
   return true;
 }

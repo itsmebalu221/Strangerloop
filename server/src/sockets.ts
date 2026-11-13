@@ -45,6 +45,7 @@ export function stopStatsLoop(statsTimer?: ReturnType<typeof setInterval>): void
   lastTypingAt.clear();
   reportTimes.clear();
   stopModerationJanitor();
+  match.stopPairingLoop();
 }
 
 export function attachSockets(http: HttpServer): { io: Server; statsTimer: ReturnType<typeof setInterval> } {
@@ -78,11 +79,13 @@ export function attachSockets(http: HttpServer): { io: Server; statsTimer: Retur
     socketsByUser.set(userId, socket);
     socket.join(`user:${userId}`);
     socket.emit("welcome", { userId, auth: AUTH_MODE });
+    socket.emit("stats", getLiveStats());
 
     /* ---------- queue ---------- */
     socket.on("queue:join", (payload?: { prefs?: unknown }) => {
       const gate = accountAllowed(userId);
       if (!gate.ok) return socket.emit("queue:error", { message: gate.reason });
+      if (match.isQueued(userId)) return socket.emit("queue:joined", { searching: match.queueSize() });
       if (!canJoinQueue(userId)) return socket.emit("queue:error", { message: "Easy there — too many searches in a row." });
 
       const row = db.getUser(userId);
@@ -109,6 +112,7 @@ export function attachSockets(http: HttpServer): { io: Server; statsTimer: Retur
         if (peer) io.to(`user:${peer}`).emit("chat:ended", { sessionId: stale, reason: "next" });
       }
 
+      socket.emit("queue:joined", { searching: match.queueSize() + 1 });
       match.joinQueue({
         userId,
         socketId: socket.id,
@@ -117,35 +121,44 @@ export function attachSockets(http: HttpServer): { io: Server; statsTimer: Retur
         since: Date.now(),
         emit: (event, p) => socket.emit(event, p),
       });
-      socket.emit("queue:joined", { searching: match.queueSize() });
     });
 
     socket.on("queue:leave", () => match.leaveQueue(userId));
 
     /* ---------- chat ---------- */
-    socket.on("chat:message", (payload: { sessionId?: string; text?: unknown }) => {
+    socket.on("chat:message", (payload: { sessionId?: string; text?: unknown }, ack?: (result: unknown) => void) => {
+      const reply = (result: unknown) => { if (typeof ack === "function") ack(result); };
       const sid = typeof payload?.sessionId === "string" ? payload.sessionId : undefined;
       const s = sid ? match.getSession(sid) : undefined;
-      if (!s || (s.a !== userId && s.b !== userId)) return;
-      if (!consumeMessageToken(userId)) return socket.emit("chat:throttled", {});
+      if (!s || (s.a !== userId && s.b !== userId)) return reply({ ok: false, error: "This chat has ended. Choose Next to find someone new." });
+      const gate = accountAllowed(userId);
+      if (!gate.ok) return reply({ ok: false, error: gate.reason });
+      if (!consumeMessageToken(userId)) {
+        socket.emit("chat:throttled", { sessionId: sid });
+        return reply({ ok: false, error: "You're sending too quickly. Wait a moment and try again." });
+      }
 
       const text = typeof payload.text === "string" ? payload.text : "";
       const { verdict, body } = moderate(userId, text);
       trackBody(userId, body);
-      if (!body.trim()) return;
+      if (!body.trim()) return reply({ ok: false, error: "Message cannot be empty." });
 
-      if (verdict.risk === "high") return socket.emit("chat:blocked", { category: verdict.category });
+      if (verdict.risk === "high") {
+        socket.emit("chat:blocked", { sessionId: sid, category: verdict.category });
+        return reply({ ok: false, error: "Message not sent — it looked like spam or something unsafe." });
+      }
       if (verdict.risk === "severe") {
         match.endChat(sid!, "moderation");
         io.to(`user:${s.a}`).emit("chat:terminated", { sessionId: sid, reason: verdict.category });
         io.to(`user:${s.b}`).emit("chat:terminated", { sessionId: sid, reason: verdict.category });
-        return;
+        return reply({ ok: false, error: "This conversation was ended by our safety systems." });
       }
 
-      db.logMessage(sid!, userId, body, verdict.risk);
-      const out = { sessionId: sid, from: userId, text: body, at: Date.now() };
+      const id = db.logMessage(sid!, userId, body, verdict.risk);
+      const out = { id, sessionId: sid, from: userId, text: body, at: Date.now() };
       io.to(`user:${s.a}`).emit("chat:message", out);
       io.to(`user:${s.b}`).emit("chat:message", out);
+      reply({ ok: true, message: out });
       if (verdict.risk === "suspicious") socket.emit("chat:warn", { category: verdict.category });
     });
 
@@ -169,11 +182,21 @@ export function attachSockets(http: HttpServer): { io: Server; statsTimer: Retur
       io.to(`user:${peer}`).emit("chat:ended", { sessionId: sid, reason: "next" });
     });
 
+    socket.on("chat:leave", (payload: { sessionId?: string }) => {
+      const sid = payload?.sessionId;
+      const s = typeof sid === "string" ? match.getSession(sid) : undefined;
+      if (!s || (s.a !== userId && s.b !== userId)) return;
+      match.endChat(sid!, "leave");
+      const peer = s.a === userId ? s.b : s.a;
+      io.to(`user:${peer}`).emit("chat:ended", { sessionId: sid, reason: "leave" });
+    });
+
     /* ---------- connect ---------- */
     socket.on("connect:request", (payload: { sessionId?: string }) => {
       const sid = payload?.sessionId;
       const s = typeof sid === "string" ? match.getSession(sid) : undefined;
       if (!s || (s.a !== userId && s.b !== userId)) return;
+      if (s.connectRequests.has(userId)) return;
       const mutual = match.requestConnect(sid!, userId); // persists on mutual
       const row = db.getUser(userId);
       if (mutual) {
@@ -186,7 +209,7 @@ export function attachSockets(http: HttpServer): { io: Server; statsTimer: Retur
     });
 
     /* ---------- safety ---------- */
-    socket.on("report", (payload: { sessionId?: string; reported?: string; reason?: string; details?: string }) => {
+    socket.on("report", (payload: { sessionId?: string; reported?: string; reason?: string; details?: string; block?: boolean }) => {
       if (!payload?.reported || !payload?.reason) return;
       if (typeof payload.reported !== "string" || typeof payload.reason !== "string") return;
       if (!canReport(userId)) return socket.emit("report:received", { error: "Too many reports — try again shortly." });
@@ -203,7 +226,8 @@ export function attachSockets(http: HttpServer): { io: Server; statsTimer: Retur
         db.setUserStatus(payload.reported, "restricted");
         db.logModEvent(payload.reported, "restrict", payload.reason, `auto-restricted via report #${id}`);
       }
-      db.blockUser(userId, payload.reported, `report:${payload.reason}`);
+      if (payload.block !== false) db.blockUser(userId, payload.reported, `report:${payload.reason}`);
+      if (severe) match.leaveQueue(payload.reported);
       // the UI promises "conversation ends immediately" — honor it for both sides
       const sid = payload.sessionId;
       const s = typeof sid === "string" ? match.getSession(sid) : undefined;

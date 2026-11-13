@@ -1,226 +1,214 @@
 # Keyword Map
 
-Each primary keyword has one canonical target URL.
+Each group has one preferred URL. Terms describe the intent covered by the page copy and FAQs.
 
-- **random chat** -> /random-chat/
-- **chat with strangers** -> /chat-with-strangers/
-- **talk to strangers online** -> /talk-to-strangers-online/
-- **random text chat** -> /random-text-chat/
-- **interest based chat** -> /interest-based-chat/
-- **make friends online** -> /make-friends-online/
-- **anonymous chat** -> /anonymous-chat/
-- **language exchange** -> /language-exchange/
-- **online chat safety** -> /online-chat-safety/
-- **Omegle alternative** -> /omegle-alternative/
-- **Chatroulette alternative** -> /chatroulette-alternative/
-- **random chat India** -> /random-chat-india/
-- **random chat online with people who share your interests** -> /random-chat/
-- **random stranger chat with a safer starting point** -> /random-stranger-chat/
-- **random online chat for real conversations** -> /random-online-chat/
-- **random chat online for a quick conversation** -> /random-chat-online/
-- **free random chat without a complicated setup** -> /free-random-chat/
-- **random chat with strangers around shared interests** -> /random-chat-with-strangers/
-- **random chat with people who want to talk** -> /random-chat-with-people/
-- **chat with random people online** -> /chat-with-random-people/
-- **chat with strangers about something real** -> /chat-with-strangers/
-- **chat with strangers online by text** -> /chat-with-strangers-online/
-- **talk to strangers through shared interests** -> /talk-to-strangers/
-- **talk to strangers online with clear boundaries** -> /talk-to-strangers-online/
-- **talk with strangers online without the pressure** -> /talk-with-strangers-online/
-- **online stranger chat with interest-based matching** -> /online-stranger-chat/
-- **stranger chat for curious conversations** -> /stranger-chat/
-- **stranger chat online with a human pace** -> /stranger-chat-online/
-- **a stranger chat room built around one conversation** -> /stranger-chat-room/
-- **meet strangers online through conversation** -> /meet-strangers-online/
-- **meet new people online through shared topics** -> /meet-new-people/
-- **meet new people online with interest signals** -> /meet-new-people-online/
-- **meet someone new for a conversation** -> /meet-someone-new/
-- **find people to chat with online** -> /people-to-chat-with/
-- **find someone to talk to online** -> /someone-to-talk-to-online/
-- **text chat online for new conversations** -> /text-chat/
-- **random text chat with a new person** -> /random-text-chat/
-- **text chat with strangers about shared interests** -> /text-chat-with-strangers/
-- **text chat with strangers online** -> /text-chat-with-strangers-online/
-- **free text chat for meeting new people** -> /free-text-chat/
-- **free text chat with strangers** -> /free-text-chat-with-strangers/
-- **online text chat with a better opening** -> /online-text-chat/
-- **anonymous text chat with honest boundaries** -> /anonymous-text-chat/
-- **anonymous text chat with strangers** -> /anonymous-text-chat-with-strangers/
-- **stranger text chat for one conversation at a time** -> /stranger-text-chat/
-- **random text chat online by topic** -> /random-text-chat-online/
-- **chat with strangers by text** -> /chat-with-strangers-by-text/
-- **text chat online without video pressure** -> /text-chat-online/
-- **anonymous chat with a chosen display name** -> /anonymous-chat/
-- **anonymous chat online with safety controls** -> /anonymous-chat-online/
-- **anonymous chat with strangers online** -> /anonymous-chat-with-strangers/
-- **anonymous stranger chat for low-pressure conversation** -> /anonymous-stranger-chat/
-- **private stranger chat with respectful limits** -> /private-stranger-chat/
-- **anonymous random chat with interest signals** -> /anonymous-random-chat/
-- **how to chat anonymously online responsibly** -> /chat-anonymously-online/
-- **talk anonymously online without oversharing** -> /talk-anonymously-online/
-- **make friends online through better conversations** -> /make-friends-online/
-- **make new friends online around shared interests** -> /make-new-friends-online/
-- **meet friends online one conversation at a time** -> /meet-friends-online/
-- **find friends online who like similar topics** -> /find-friends-online/
-- **meet interesting people online** -> /meet-interesting-people/
-- **meet people online without a public performance** -> /meet-people-online/
-- **online friendship starts with shared curiosity** -> /online-friendship/
-- **find online friends for real conversations** -> /online-friends/
-- **make friends with strangers carefully** -> /make-friends-with-strangers/
-- **meet new people to chat with** -> /meet-new-people-to-chat-with/
-- **find people to talk to online** -> /people-to-talk-to-online/
-- **find someone to talk to respectfully** -> /find-someone-to-talk-to/
-- **interest-based chat for more relevant matches** -> /interest-based-chat/
-- **interest-based stranger chat** -> /interest-based-stranger-chat/
-- **interest matching chat for shared topics** -> /interest-matching-chat/
-- **chat by interest with someone new** -> /chat-by-interest/
-- **chat with people who share your interests** -> /chat-with-similar-interests/
-- **chat with people who share your interests online** -> /chat-with-people-who-share-your-interests/
-- **meet people with similar interests** -> /meet-people-with-similar-interests/
-- **find people with similar interests to talk with** -> /find-people-with-similar-interests/
-- **topic-based chat for focused conversations** -> /topic-based-chat/
-- **topic chat with strangers** -> /topic-chat-with-strangers/
-- **chat with people who like gaming** -> /interests/gaming/
-- **meet people who enjoy video games** -> /interests/video-games/
-- **chat with people who like coding** -> /interests/coding/
-- **find programming conversations online** -> /interests/programming/
-- **chat with people interested in technology** -> /interests/technology/
-- **chat about artificial intelligence** -> /interests/artificial-intelligence/
-- **meet people interested in ai** -> /interests/ai/
-- **chat with people interested in startups** -> /interests/startups/
-- **discuss business with new people** -> /interests/business/
-- **meet people interested in entrepreneurship** -> /interests/entrepreneurship/
-- **chat with people who love music** -> /interests/music/
-- **discuss movies with someone new** -> /interests/movies/
-- **chat with people interested in anime** -> /interests/anime/
-- **talk about books with new people** -> /interests/books/
-- **chat with people who like travel** -> /interests/travel/
-- **meet people interested in photography** -> /interests/photography/
-- **chat with people who follow sports** -> /interests/sports/
-- **find football conversations online** -> /interests/football/
-- **chat with people who like cricket** -> /interests/cricket/
-- **chat with people who are studying** -> /interests/study/
-- **meet people interested in college life** -> /interests/college/
-- **talk about careers with new people** -> /interests/career/
-- **chat with people interested in language learning** -> /interests/language-learning/
-- **practice english through conversation** -> /interests/english/
-- **chat with people who like creative writing** -> /interests/creative-writing/
-- **language exchange through text conversation** -> /language-exchange/
-- **language exchange chat online** -> /language-exchange-chat/
-- **practice english online through text chat** -> /practice-english/
-- **practice english online with new conversation partners** -> /practice-english-online/
-- **english conversation practice for everyday topics** -> /english-conversation/
-- **english chat with strangers** -> /english-chat-with-strangers/
-- **chat with english speakers online** -> /chat-with-native-english-speakers/
-- **language learning chat for consistent practice** -> /language-learning-chat/
-- **practice speaking english through chat planning** -> /practice-speaking-english/
-- **learn english by chatting about real interests** -> /learn-english-by-chatting/
-- **conversation starters for meeting someone new** -> /conversation-starters/
-- **conversation topics for a new online chat** -> /conversation-topics/
-- **things to talk about with someone new** -> /things-to-talk-about/
-- **how to talk to strangers online** -> /how-to-talk-to-strangers/
-- **how to start a conversation online** -> /how-to-start-a-conversation/
-- **how to make friends online carefully** -> /how-to-make-friends-online/
-- **how to meet new people online** -> /how-to-meet-new-people-online/
-- **how to have better online conversations** -> /how-to-have-better-online-conversations/
-- **online conversation tips that feel natural** -> /online-conversation-tips/
-- **stranger chat tips for a respectful first exchange** -> /stranger-chat-tips/
-- **random chat tips for better matches** -> /random-chat-tips/
-- **online chat safety for new conversations** -> /online-chat-safety/
-- **what is random chat?** -> /what-is-random-chat/
-- **what is stranger chat?** -> /what-is-stranger-chat/
-- **what is anonymous chat?** -> /what-is-anonymous-chat/
-- **how does random chat work?** -> /how-does-random-chat-work/
-- **how does stranger chat work?** -> /how-does-stranger-chat-work/
-- **how to chat with strangers** -> /how-to-chat-with-strangers/
-- **how to talk to strangers online safely** -> /how-to-talk-to-strangers-online/
-- **how to start a chat with a stranger** -> /how-to-start-a-chat-with-a-stranger/
-- **what to talk about with a stranger** -> /what-to-talk-about-with-a-stranger/
-- **is random chat safe?** -> /is-random-chat-safe/
-- **how to stay safe chatting with strangers** -> /how-to-stay-safe-chatting-with-strangers/
-- **what is interest-based chat?** -> /what-is-interest-based-chat/
-- **how does interest-based matching work?** -> /how-interest-based-matching-works/
-- **random chat vs social media** -> /random-chat-vs-social-media/
-- **random chat vs dating apps** -> /random-chat-vs-dating-apps/
-- **text chat vs video chat** -> /text-chat-vs-video-chat/
-- **omegle alternative for text-first conversations** -> /omegle-alternative/
-- **omegle alternatives: what to compare** -> /omegle-alternatives/
-- **omegle replacement for interest-led chat** -> /omegle-replacement/
-- **sites like omegle: text, video, and community formats** -> /sites-like-omegle/
-- **websites like omegle for meeting new people** -> /websites-like-omegle/
-- **free omegle alternative options to explore** -> /omegle-alternative-free/
-- **chatroulette alternative for text conversations** -> /chatroulette-alternative/
-- **chatroulette alternatives: how the formats differ** -> /chatroulette-alternatives/
-- **sites like chatroulette and text chat options** -> /sites-like-chatroulette/
-- **ometv alternative for text-first chat** -> /ometv-alternative/
-- **ometv alternatives to compare carefully** -> /ometv-alternatives/
-- **emerald chat alternative for interest-based text chat** -> /emerald-chat-alternative/
-- **emerald chat alternatives for meeting new people** -> /emerald-chat-alternatives/
-- **monkey app alternative for more deliberate chat** -> /monkey-app-alternative/
-- **monkey app alternatives: text and video choices** -> /monkey-app-alternatives/
-- **random chat in india through shared interests** -> /random-chat-india/
-- **stranger chat india for new conversations** -> /stranger-chat-india/
-- **chat with strangers in india online** -> /chat-with-strangers-india/
-- **random text chat india** -> /random-text-chat-india/
-- **talk to strangers online in india** -> /talk-to-strangers-india/
-- **make friends online in india** -> /make-friends-online-india/
-- **online friendship in india through conversation** -> /online-friendship-india/
-- **interest-based chat for people in india** -> /interest-based-chat-india/
-- **telugu chat and interest-based conversation** -> /telugu-chat/
-- **hindi chat with new people online** -> /hindi-chat/
-- **english chat in india** -> /english-chat-india/
-- **language exchange in india through text chat** -> /language-exchange-india/
-- **how to talk to strangers online without making it awkward** -> /blog/how-to-talk-to-strangers-online/
-- **best conversation starters for a new online chat** -> /blog/best-conversation-starters/
-- **how to find people with similar interests online** -> /blog/how-to-find-people-with-similar-interests/
-- **the practical random chat safety guide** -> /blog/random-chat-safety-guide/
-- **how interest-based chat works in practice** -> /blog/how-interest-based-chat-works/
-- **how to start a conversation online** -> /blog/how-to-start-a-conversation-online/
-- **things to talk about with new people** -> /blog/things-to-talk-about-with-new-people/
-- **random chat vs social media: choosing the right format** -> /blog/random-chat-vs-social-media/
-- **random chat vs dating apps: different intentions** -> /blog/random-chat-vs-dating-apps/
-- **text chat vs video chat: comfort, pace, and context** -> /blog/text-chat-vs-video-chat/
-- **how to practice english online consistently** -> /blog/how-to-practice-english-online/
-- **how to meet people from other countries online** -> /blog/how-to-meet-people-from-other-countries/
-- **how to have better online conversations** -> /blog/how-to-have-better-online-conversations/
-- **what to do when an online chat goes quiet** -> /blog/what-to-do-when-a-chat-goes-quiet/
-- **how to leave an online conversation politely** -> /blog/how-to-leave-a-conversation-politely/
-- **how to spot pressure in an online chat** -> /blog/how-to-spot-pressure-online/
-- **how to protect your privacy in new chats** -> /blog/how-to-protect-your-privacy-online/
-- **conversation topics for gamers** -> /blog/conversation-topics-for-gamers/
-- **conversation topics for coders** -> /blog/conversation-topics-for-coders/
-- **conversation topics for music lovers** -> /blog/conversation-topics-for-music-lovers/
-- **conversation topics for travelers** -> /blog/conversation-topics-for-travelers/
-- **healthy boundaries in online friendship** -> /blog/online-friendship-boundaries/
-- **how to build online friendships slowly** -> /blog/how-to-build-online-friendships/
-- **why shared interests help conversations** -> /blog/why-shared-interests-help-conversation/
-- **how to ask better questions online** -> /blog/how-to-ask-better-questions/
-- **how to listen in text chat** -> /blog/how-to-listen-in-text-chat/
-- **how to move beyond small talk online** -> /blog/how-to-avoid-small-talk/
-- **is online friendship real?** -> /blog/is-online-friendship-real/
-- **how to use a display name safely** -> /blog/how-to-use-a-display-name/
-- **what to share in a first online chat** -> /blog/what-to-share-in-a-first-chat/
-- **how to respond to online harassment** -> /blog/how-to-report-online-harassment/
-- **how to choose a chat platform** -> /blog/how-to-choose-a-chat-platform/
-- **can random chat work for introverts?** -> /blog/random-chat-for-introverts/
-- **online chat for language learners** -> /blog/online-chat-for-language-learners/
-- **how to talk about hobbies online** -> /blog/how-to-talk-about-hobbies/
-- **how to make an online chat more interesting** -> /blog/how-to-make-a-chat-more-interesting/
-- **what makes a good online conversation?** -> /blog/what-makes-a-good-online-conversation/
-- **online chat etiquette for new conversations** -> /blog/online-chat-etiquette/
-- **how to meet people online after moving** -> /blog/how-to-meet-people-after-moving/
-- **how to find study buddies online** -> /blog/how-to-find-study-buddies-online/
-- **how to talk about career goals online** -> /blog/how-to-talk-about-career-goals/
-- **how to discuss difficult topics respectfully** -> /blog/how-to-discuss-difficult-topics/
-- **how to find common ground with someone new** -> /blog/how-to-find-common-ground/
-- **how to recover from an awkward opening** -> /blog/how-to-recover-from-an-awkward-opening/
-- **how to chat across cultural differences** -> /blog/how-to-chat-with-someone-from-another-culture/
-- **how to use interests in your profile** -> /blog/how-to-use-interests-in-your-profile/
-- **how to know when to skip a chat** -> /blog/how-to-know-when-to-skip-a-chat/
-- **online chat and personal information** -> /blog/online-chat-and-personal-information/
-- **how to start a chat about movies** -> /blog/how-to-start-a-chat-about-movies/
-- **how to start a chat about books** -> /blog/how-to-start-a-chat-about-books/
-- **how to start a chat about travel** -> /blog/how-to-start-a-chat-about-travel/
-- **how to start a chat about ai** -> /blog/how-to-start-a-chat-about-ai/
-- **explore interest-based chat topics** -> /interests/
-- **strangerloop conversation and friendship guides** -> /blog/
+## talk to strangers online
+
+- Preferred URL: `/`
+- random chat
+- chat with strangers
+- stranger chat
+- free random chat
+- random chat online
+- random chat with strangers
+- talk with strangers online
+- chat with random people
+- meet strangers online
+- online stranger chat
+- free stranger chat
+- stranger chat online
+- random chat for adults
+- chat with strangers online free
+- meet new people online
+- one-on-one stranger chat
+- find someone to chat with
+- random chat site
+- talk to random people online
+- chatting with strangers
+
+## random text chat
+
+- Preferred URL: `/random-text-chat/`
+- text chat with strangers
+- text chat online
+- free text chat with strangers
+- text-only chat
+- chat without camera
+- random chat without video
+- one-on-one text chat
+- chat with strangers by text
+- text chat without a microphone
+- text chat in browser
+- random text chat online
+- chat with strangers without downloading an app
+- chat with strangers without video
+- free random text chat
+
+## anonymous chat
+
+- Preferred URL: `/anonymous-chat/`
+- anonymous text chat
+- anonymous chat with strangers
+- anonymous text chat with strangers
+- private stranger chat
+- chat anonymously online
+- anonymous random chat
+- chat with a nickname
+- anonymous chat without camera
+
+## interest-based chat
+
+- Preferred URL: `/interest-based-chat/`
+- chat with people who share your interests
+- chat by interest
+- interest matching chat
+- meet people with similar interests
+- random chat with interests
+- chat with strangers with common interests
+- topic based chat
+- find like-minded people online
+- hobby chat with strangers
+
+## make friends online
+
+- Preferred URL: `/make-friends-online/`
+- make new friends online
+- find friends online
+- meet friends online
+- make friends through shared interests
+- online friendship
+- meet people to chat with
+- online friendship chat
+
+## language exchange chat
+
+- Preferred URL: `/language-exchange/`
+- text language exchange
+- language exchange online
+- chat with language learners
+- language practice chat
+- language learning chat
+- practice languages with strangers
+- multilingual text chat
+
+## practice English online by text
+
+- Preferred URL: `/practice-english-online/`
+- English chat with strangers
+- English conversation practice chat
+- learn English by chatting
+- English writing practice chat
+- chat in English online
+- English text chat with strangers
+
+## random chat India
+
+- Preferred URL: `/random-chat-india/`
+- stranger chat India
+- chat with strangers in India
+- random text chat India
+- talk to strangers India
+- Indian stranger chat
+- free text chat India
+- chat with Indian strangers
+- online chat India by text
+
+## Hindi chat
+
+- Preferred URL: `/hindi-chat/`
+- Hindi chat with strangers
+- Hindi text chat
+- random Hindi chat
+- chat in Hindi online
+- Hinglish chat
+
+## Telugu chat
+
+- Preferred URL: `/telugu-chat/`
+- Telugu chat with strangers
+- Telugu text chat
+- random Telugu chat
+- chat in Telugu online
+
+## Tamil chat
+
+- Preferred URL: `/tamil-chat/`
+- Tamil chat with strangers
+- Tamil text chat
+- random Tamil chat
+- chat in Tamil online
+
+## Omegle alternative
+
+- Preferred URL: `/omegle-alternative/`
+- Omegle text chat alternative
+- text-only Omegle alternative
+- sites like Omegle for text chat
+- free Omegle alternative
+- Omegle replacement
+- Omegle alternative without video
+- websites like Omegle
+- random text chat like Omegle
+
+## Chitchat alternative
+
+- Preferred URL: `/chitchat-alternative/`
+- Chitchat.gg text chat alternative
+- sites like Chitchat for text
+- text-only Chitchat alternative
+
+## Joingy alternative
+
+- Preferred URL: `/joingy-alternative/`
+- Joingy text chat alternative
+- sites like Joingy for text
+- Joingy alternative without video
+
+## Emerald Chat alternative
+
+- Preferred URL: `/emerald-chat-alternative/`
+- Emerald Chat text alternative
+- sites like Emerald Chat for text
+- interest matching chat alternative
+
+## Chatroulette alternative
+
+- Preferred URL: `/chatroulette-alternative/`
+- Chatroulette alternative for text chat
+- sites like Chatroulette without video
+
+## OmeTV alternative
+
+- Preferred URL: `/ometv-alternative/`
+- OmeTV alternative for text chat
+- OmeTV alternative without camera
+
+## conversation starters for strangers
+
+- Preferred URL: `/conversation-starters/`
+- questions to ask a stranger online
+- icebreakers for online chat
+- things to talk about with strangers
+- what to say in a random chat
+- how to start a text chat with a stranger
+- first message for stranger chat
+- conversation topics for meeting new people
+
+## how to talk to strangers online
+
+- Preferred URL: `/how-to-talk-to-strangers/`
+- how to chat with strangers
+- how to talk to someone new online
+- how to keep a text conversation going
+- online conversation tips
+- how to talk to strangers without being awkward
+
+## online chat safety
+
+- Preferred URL: `/online-chat-safety/`
+- how to stay safe chatting with strangers
+- is random chat safe
+- random chat safety tips
+- how to block someone in stranger chat
+- how to report a stranger chat
+- what not to share in a chat

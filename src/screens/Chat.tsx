@@ -53,7 +53,12 @@ export default function Chat({ match, live }: { match?: MatchResult; live?: Live
     msg("system", `You're now chatting with ${p.name}. Be kind — and remember: never share passwords, money info, or your exact address.`),
   ]);
   const [input, setInput] = useState("");
+  const [visibleCount, setVisibleCount] = useState(100);
   const [typing, setTyping] = useState(false);
+  const [ended, setEnded] = useState(false);
+  const endedRef = useRef(false);
+  const mountedRef = useRef(true);
+  const connectedRef = useRef(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [blockOpen, setBlockOpen] = useState(false);
@@ -67,6 +72,7 @@ export default function Chat({ match, live }: { match?: MatchResult; live?: Live
   const [reportBlock, setReportBlock] = useState(false);
 
   const feedRef = useRef<HTMLDivElement>(null);
+  const atBottomRef = useRef(true);
   const inputRef = useRef<HTMLInputElement>(null);
   const timers = useRef<number[]>([]);
   const countRef = useRef(0);
@@ -85,8 +91,12 @@ export default function Chat({ match, live }: { match?: MatchResult; live?: Live
   }, []);
 
   useEffect(() => {
+    mountedRef.current = true;
     const list = timers.current;
-    return () => list.forEach((t) => window.clearTimeout(t));
+    return () => {
+      mountedRef.current = false;
+      list.forEach((t) => window.clearTimeout(t));
+    };
   }, []);
 
   /* stranger opens the conversation (simulation only — live peers say hi themselves) */
@@ -104,7 +114,7 @@ export default function Chat({ match, live }: { match?: MatchResult; live?: Live
   /* autoscroll */
   useEffect(() => {
     const el = feedRef.current;
-    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    if (el && atBottomRef.current) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [messages, typing]);
 
   /* live-mode socket subscriptions */
@@ -116,11 +126,11 @@ export default function Chat({ match, live }: { match?: MatchResult; live?: Live
     if (!s) return;
 
     // the server relays every message to both rooms; keep only the peer's
-    // (our own optimistic bubble was already appended in send())
-    const onMessage = (m: { sessionId: string; from: string; text: string; at: number }) => {
+    // (our own bubble is appended only after the server acknowledges delivery)
+    const onMessage = (m: { id: string; sessionId: string; from: string; text: string; at: number }) => {
       if (disposed || m.sessionId !== sessionId || m.from !== p.id) return;
       setTyping(false);
-      setMessages((prev) => [...prev, { id: `l${m.at}-${m.from}`, from: "them", text: m.text, at: m.at }]);
+      setMessages((prev) => [...prev, { id: m.id, from: "them", text: m.text, at: m.at }]);
     };
     const onTyping = (t: { sessionId: string }) => {
       if (disposed || t.sessionId !== sessionId) return;
@@ -130,6 +140,10 @@ export default function Chat({ match, live }: { match?: MatchResult; live?: Live
     };
     const onEnded = (e: { sessionId: string; reason: string }) => {
       if (disposed || e.sessionId !== sessionId) return;
+      endedRef.current = true;
+      setEnded(true);
+      setTyping(false);
+      setIncoming(false);
       const why =
         e.reason === "next"
           ? "moved on to a new conversation."
@@ -145,6 +159,7 @@ export default function Chat({ match, live }: { match?: MatchResult; live?: Live
     };
     const onTerminated = (e: { sessionId: string }) => {
       if (disposed || e.sessionId !== sessionId) return;
+      endedRef.current = true;
       setFlow({ stage: "idle" });
       toast("This conversation was ended by our safety systems.", "warn");
     };
@@ -160,6 +175,7 @@ export default function Chat({ match, live }: { match?: MatchResult; live?: Live
       // persist from the server as the source of truth
       void fetchLiveConnections()
         .then((rows) => {
+          if (disposed) return;
           const row = rows.find((r) => r.peer.id === p.id);
           if (!row) return;
           addConnection({
@@ -176,9 +192,13 @@ export default function Chat({ match, live }: { match?: MatchResult; live?: Live
         })
         .catch(() => undefined);
     };
-    const onBlocked = () => {
-      if (disposed) return;
-      toast("Message not sent — it looked like spam or something unsafe.", "warn");
+    const onDisconnect = () => {
+      if (disposed || endedRef.current) return;
+      endedRef.current = true;
+      setEnded(true);
+      setTyping(false);
+      setIncoming(false);
+      setMessages((prev) => [...prev, msg("system", "Connection lost. Choose Next to find a new chat.")]);
     };
     const onWarn = (w: { category: string }) => {
       if (disposed) return;
@@ -192,7 +212,7 @@ export default function Chat({ match, live }: { match?: MatchResult; live?: Live
     s.on("chat:terminated", onTerminated);
     s.on("connect:incoming", onIncoming);
     s.on("connect:established", onEstablished);
-    s.on("chat:blocked", onBlocked);
+    s.on("disconnect", onDisconnect);
     s.on("chat:warn", onWarn);
     return () => {
       disposed = true;
@@ -203,7 +223,7 @@ export default function Chat({ match, live }: { match?: MatchResult; live?: Live
       s.off("chat:terminated", onTerminated);
       s.off("connect:incoming", onIncoming);
       s.off("connect:established", onEstablished);
-      s.off("chat:blocked", onBlocked);
+      s.off("disconnect", onDisconnect);
       s.off("chat:warn", onWarn);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -211,9 +231,12 @@ export default function Chat({ match, live }: { match?: MatchResult; live?: Live
 
   const doConnectSuccess = useCallback(
     (theyInitiated: boolean) => {
+      if (connectedRef.current) return;
+      connectedRef.current = true;
       setConnectState("connected");
       setIncoming(false);
       bumpStats({ connects: 1 });
+      if (isLive) return;
       addConnection({
         id: `c-${p.id}`,
         personaId: p.id,
@@ -241,7 +264,8 @@ export default function Chat({ match, live }: { match?: MatchResult; live?: Live
   );
 
   const sendConnectRequest = () => {
-    if (connectState !== "none" || alreadyConnected) return;
+    if (endedRef.current || connectState !== "none" || alreadyConnected) return;
+    if (isLive && !liveSocket()?.connected) return;
     connectAskedRef.current = true;
     setConnectState("sent");
     setMenuOpen(false);
@@ -266,21 +290,36 @@ export default function Chat({ match, live }: { match?: MatchResult; live?: Live
 
   const send = (raw?: string) => {
     const text = (raw ?? input).trim();
-    if (!text) return;
+    if (!text || endedRef.current) return;
     if (hasLink(text)) {
       setShakeInput((k) => k + 1);
       toast("For everyone's safety, links can't be sent in chat.", "warn");
+      return;
+    }
+    if (isLive) {
+      const s = liveSocket();
+      if (!s?.connected) {
+        toast("Connection lost. Choose Next to find a new chat.", "warn");
+        return;
+      }
+      setInput("");
+      s.timeout(8000).emit("chat:message", { sessionId, text }, (error: Error | null, result?: { ok: boolean; error?: string; message?: { id: string; text: string; at: number } }) => {
+        if (!mountedRef.current || endedRef.current) return;
+        if (error || !result?.ok || !result.message) {
+          setInput((draft) => draft || text);
+          toast(result?.error ?? "Delivery couldn't be confirmed. Check your connection before trying again.", "warn");
+          return;
+        }
+        const accepted = result.message;
+        setMessages((m) => [...m, { id: accepted.id, from: "me", text: accepted.text, at: accepted.at }]);
+        bumpStats({ messages: 1 });
+      });
       return;
     }
     setInput("");
     setMessages((m) => [...m, msg("me", text)]);
     bumpStats({ messages: 1 });
     countRef.current += 1;
-
-    if (isLive) {
-      liveSocket()?.emit("chat:message", { sessionId, text });
-      return;
-    }
 
     // typing + reply (simulation)
     const delay = replyDelay(p, text);
@@ -301,6 +340,7 @@ export default function Chat({ match, live }: { match?: MatchResult; live?: Live
   };
 
   const next = () => {
+    endedRef.current = true;
     bumpStats({ nexts: 1 });
     if (isLive) liveSocket()?.emit("chat:next", { sessionId });
     setFlow({ stage: "searching" });
@@ -308,7 +348,7 @@ export default function Chat({ match, live }: { match?: MatchResult; live?: Live
 
   const finishReport = () => {
     bumpStats({ reports: 1 });
-    if (isLive) liveSocket()?.emit("report", { sessionId, reported: p.id, reason: reportReason, details: reportDetails });
+    if (isLive) liveSocket()?.emit("report", { sessionId, reported: p.id, reason: reportReason, details: reportDetails, block: reportBlock });
     if (reportBlock) blockUser({ personaId: p.id, name: p.name, at: Date.now(), reason: reportReason });
     setReportOpen(false);
     setFlow({ stage: "idle" });
@@ -325,17 +365,23 @@ export default function Chat({ match, live }: { match?: MatchResult; live?: Live
 
   const connected = connectState === "connected" || alreadyConnected;
 
+  const leave = () => {
+    endedRef.current = true;
+    if (isLive && liveSocket()?.connected) liveSocket()?.emit("chat:leave", { sessionId });
+    setFlow({ stage: "idle" });
+  };
+
   return (
     <div className="fixed inset-0 z-[55] bg-parch flex flex-col noise">
 
       {/* ============ header ============ */}
       <header className="bg-paper border-b-2 border-ink px-4 py-3 flex items-center gap-3 shrink-0">
-        <button className="btn btn-ghost btn-icon" onClick={() => setFlow({ stage: "idle" })} aria-label="Leave chat">
+        <button className="btn btn-ghost btn-icon" onClick={leave} aria-label="Leave chat">
           <Icon name="chevron" className="w-5 h-5 rotate-180" />
         </button>
         <div className="relative">
           <Avatar name={p.name} color={p.willingness > 0.75 ? "#2FBF8F" : "#FF4B2E"} size={42} />
-          <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-mint border-2 border-paper" />
+          <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ${ended ? "bg-moss" : "bg-mint"} border-2 border-paper`} />
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-bold leading-tight truncate">
@@ -350,7 +396,7 @@ export default function Chat({ match, live }: { match?: MatchResult; live?: Live
           </p>
         </div>
 
-        {!connected && connectState === "none" && (
+        {!ended && !connected && connectState === "none" && (
           <button className="btn btn-coral btn-sm text-sm hidden sm:inline-flex" onClick={sendConnectRequest}>
             <Icon name="heart" className="w-4 h-4" /> Connect
           </button>
@@ -375,7 +421,7 @@ export default function Chat({ match, live }: { match?: MatchResult; live?: Live
             <>
               <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
               <div className="absolute right-0 top-12 z-20 w-52 card card-ink overflow-hidden animate-pop">
-                {!connected && connectState !== "sent" && (
+                {!ended && !connected && connectState !== "sent" && (
                   <button className="w-full text-left px-4 py-3 font-bold text-sm hover:bg-butter flex items-center gap-2.5 transition-colors" onClick={sendConnectRequest}>
                     <Icon name="heart" className="w-4.5 h-4.5 text-coral" /> Send connect request
                   </button>
@@ -396,7 +442,10 @@ export default function Chat({ match, live }: { match?: MatchResult; live?: Live
       </header>
 
       {/* ============ feed ============ */}
-      <div ref={feedRef} className="flex-1 overflow-y-auto px-4 py-5">
+      <div ref={feedRef} className="flex-1 overflow-y-auto px-4 py-5" onScroll={(event) => {
+        const el = event.currentTarget;
+        atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+      }}>
         <div className="max-w-2xl mx-auto space-y-3">
           {/* shared interests card */}
           {sharedIds.length > 0 && (
@@ -423,7 +472,10 @@ export default function Chat({ match, live }: { match?: MatchResult; live?: Live
             </div>
           )}
 
-          {messages.map((m) =>
+          {messages.length > visibleCount && (
+            <button className="btn btn-sm" onClick={() => setVisibleCount((count) => count + 100)}>Show earlier messages</button>
+          )}
+          {messages.slice(-visibleCount).map((m) =>
             m.from === "system" ? (
               <div key={m.id} className="text-center px-6">
                 <span className="inline-block text-[0.78rem] font-semibold text-fern bg-ink/6 border border-ink/10 rounded-full px-4 py-2 leading-snug">
@@ -455,14 +507,14 @@ export default function Chat({ match, live }: { match?: MatchResult; live?: Live
           )}
 
           {/* incoming connect request */}
-          {incoming && !connected && (
+          {!ended && incoming && !connected && (
             <div className="card card-ink p-4 bg-butter animate-pop max-w-md mx-auto">
               <p className="font-bold flex items-center gap-2 mb-3">
                 <Icon name="heart-fill" className="w-5 h-5 text-coral" /> {p.name} wants to connect!
               </p>
               <p className="text-sm font-medium text-fern mb-4">Mutual connects can message each other later from your Connections page. No personal info is shared.</p>
               <div className="flex gap-2">
-                <button className="btn btn-mint btn-sm flex-1" onClick={() => doConnectSuccess(true)}>Accept</button>
+                <button className="btn btn-mint btn-sm flex-1" onClick={() => isLive ? sendConnectRequest() : doConnectSuccess(true)}>Accept</button>
                 <button className="btn btn-sm flex-1" onClick={() => { setIncoming(false); toast("Request dismissed — you can still connect anytime.", "info"); }}>
                   Not now
                 </button>
@@ -492,7 +544,8 @@ export default function Chat({ match, live }: { match?: MatchResult; live?: Live
             <input
               ref={inputRef}
               className={`field ${shakeInput ? "border-ember" : ""}`}
-              placeholder="Type a message…"
+              placeholder={ended ? "Chat ended — choose Next to meet someone new" : "Type a message…"}
+              disabled={ended}
               value={input}
               maxLength={500}
               onChange={(e) => {
@@ -513,7 +566,7 @@ export default function Chat({ match, live }: { match?: MatchResult; live?: Live
               autoFocus
             />
           </div>
-          <button className="btn btn-coral btn-md" onClick={() => send()} aria-label="Send message" disabled={!input.trim()}>
+          <button className="btn btn-coral btn-md" onClick={() => send()} aria-label="Send message" disabled={ended || !input.trim()}>
             <Icon name="send" className="w-5 h-5" />
           </button>
           <button className="btn btn-ink btn-md" onClick={next} title="End this chat and find someone new">

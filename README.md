@@ -51,6 +51,19 @@ Verify the full pipeline (profile → match → chat → connect) against a runn
 cd server && npm run smoke
 ```
 
+Run the isolated regression checks and synthetic matchmaking benchmark:
+
+```bash
+npm test                         # React chat and searching lifecycle checks
+npm --prefix server test         # temporary local server + in-memory SQLite
+npm --prefix server run benchmark # 500 queued users, no external traffic
+```
+
+The server tests need loopback network access. Set `BENCH_USERS` to change the
+benchmark queue size. The benchmark measures local CPU work, not production
+network latency. Queue/session state lives in one server process; running multiple
+instances requires shared matchmaking state and Socket.IO coordination.
+
 Server environment variables: see `.env.example`. Highlights — `CLIENT_ORIGIN` (allowed browser origins), `SUPABASE_JWT_SECRET` (enables real token verification; empty = demo tokens for local dev only), `ADMIN_TOKEN` (enables `/admin/*`), `STATIC_DIR` (serve a built frontend from the same process), `TRUST_PROXY`, `DATABASE_PATH`.
 
 ## One-container deploy (Docker)
@@ -103,6 +116,8 @@ npm run build      # outputs static site to dist/
 **Option A — full stack (recommended):** `docker compose up --build` serves the SPA + API + websockets from one container on :8787.
 
 **Option B — static frontend only:** host `dist/` anywhere (Vercel / Netlify / GitHub Pages — the included workflow deploys to Pages on push to `main`) and run `server/` separately; set `VITE_SERVER_URL` at build time to its public URL and add that origin to the server's `CLIENT_ORIGIN`.
+
+Set `SEO_SITE_URL` in the build environment to the public site URL, including any deployment subpath, to generate the canonical URLs and sitemap. The GitHub Pages workflow uses the configured Pages URL by default. After building, `npm run seo:validate` checks the generated pages, links, and redirects. The build also updates `KEYWORD_MAP.md` with each search topic and its preferred page.
 
 Remember to set `VITE_APP_URL` to the deployed origin so Google OAuth redirects land correctly. For production auth, set `SUPABASE_JWT_SECRET` on the server so tokens are actually verified — demo-token mode is for local development only.
 

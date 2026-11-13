@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { authMode } from "../auth";
+import { LIVE_ENABLED } from "../config";
+import { liveRest } from "../live";
 import { GUIDELINES, SAFETY_TIPS } from "../data";
 import { useStore } from "../store";
 import type { Prefs } from "../types";
@@ -131,7 +133,13 @@ export default function Settings() {
                     {new Date(b.at).toLocaleDateString()} · {b.reason === "blocked" ? "blocked" : "reported & blocked"}
                   </span>
                 </div>
-                <button className="btn btn-sm text-xs" onClick={() => { unblockUser(b.personaId); toast(`${b.name} unblocked.`, "info"); }}>
+                <button className="btn btn-sm text-xs" onClick={async () => {
+                  try {
+                    if (LIVE_ENABLED) await liveRest(`/blocks/${encodeURIComponent(b.personaId)}`, { method: "DELETE" });
+                    unblockUser(b.personaId);
+                    toast(`${b.name} unblocked.`, "info");
+                  } catch (error) { toast(error instanceof Error ? error.message : "Couldn't unblock this person.", "warn"); }
+                }}>
                   Unblock
                 </button>
               </div>

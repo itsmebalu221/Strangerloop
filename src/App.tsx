@@ -2,7 +2,7 @@ import { Component, useEffect, useState } from "react";
 import type { ErrorInfo, ReactNode } from "react";
 import { StoreProvider, useStore } from "./store";
 import { LIVE_ENABLED } from "./config";
-import { getLiveSocket, onLiveStats } from "./live";
+import { closeLiveSocket, getLiveSocket, onLiveStats } from "./live";
 import type { LiveStats, View } from "./types";
 import { AUTH_MODE } from "./config";
 import { Icon, Logo, LogoMark, OnlinePill, ToastHost } from "./components/ui";
@@ -28,11 +28,11 @@ function Shell() {
   const [liveStats, setLiveStats] = useState<LiveStats | null>(null);
 
   useEffect(() => {
-    if (!LIVE_ENABLED) return;
+    if (!LIVE_ENABLED || !authReady || !authUser) return;
     const off = onLiveStats(setLiveStats);
     void getLiveSocket().catch(() => setLiveStats(null));
-    return off;
-  }, []);
+    return () => { off(); closeLiveSocket(); };
+  }, [authReady, authUser?.id]);
 
   if (!authReady || !hydrated) return <Boot />;
   if (!authUser) return <AuthScreen />;

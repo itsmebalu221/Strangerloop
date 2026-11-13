@@ -35,6 +35,7 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    if (LIVE_ENABLED) return;
     const t = window.setInterval(() => {
       tickRef.current += 1;
       setRows((prev) => prev.map((r) => ({ ...r, secs: r.secs + 1 })));
@@ -56,9 +57,9 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const shownOnline = liveStats ? liveStats.online : online;
-  const shownMatches = liveStats ? liveStats.matchedToday : matchesToday;
-  const queueCount = liveStats ? liveStats.searching : Math.round(online * 0.07);
+  const shownOnline = LIVE_ENABLED ? liveStats?.online ?? 0 : online;
+  const shownMatches = LIVE_ENABLED ? liveStats?.matchedToday ?? 0 : matchesToday;
+  const queueCount = LIVE_ENABLED ? liveStats?.searching ?? 0 : Math.round(online * 0.07);
 
   const startSearch = () => {
     if (prefs.agePref.length === 0) {
@@ -142,7 +143,7 @@ export default function Home() {
           </div>
 
           <p className="mt-5 text-xs font-semibold text-moss animate-rise" style={{ animationDelay: "0.3s" }}>
-            Median time to match right now: <span className="text-teal font-mono">3.8s</span> · Anonymous · 18+ · Report & block in one tap
+            {LIVE_ENABLED ? "Match time depends on who is searching" : <>Demo match time: <span className="text-teal font-mono">3.8s</span></>} · Anonymous · 18+ · Report & block in one tap
           </p>
         </div>
 
@@ -155,8 +156,7 @@ export default function Home() {
                   <span className="absolute inline-flex w-full h-full rounded-full bg-mint animate-pulse-dot" />
                   <span className="relative inline-flex rounded-full w-2 h-2 bg-mint" />
                 </span>
-                {liveStats ? "LIVE — searching right now" : "SIMULATED — demo activity"}
-                {liveStats ? "LIVE — searching right now" : "SIMULATED — demo activity"}
+                {LIVE_ENABLED ? "LIVE — searching right now" : "SIMULATED — demo activity"}
               </span>
               <span className="font-mono text-xs text-paper/70">{LIVE_ENABLED && liveStats ? `${liveStats.searching} in queue` : `${queueCount} in queue`}</span>
             </div>

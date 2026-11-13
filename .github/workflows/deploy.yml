@@ -41,17 +41,21 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Build (relative base for Pages subpaths)
-        run: npx vite build --base=./
+      - name: Configure Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Build app and search pages
+        run: |
+          npx vite build --base=./
+          node scripts/generate-seo.mjs
+          npm run seo:validate
         env:
-          # Set these as repo Secrets → Actions variables if you use real auth:
-          VITE_APP_URL: ${{ vars.VITE_APP_URL || github.server_url }}
+          SEO_SITE_URL: ${{ vars.SEO_SITE_URL || steps.pages.outputs.base_url }}
+          VITE_APP_URL: ${{ vars.VITE_APP_URL || steps.pages.outputs.base_url }}
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || '' }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY || '' }}
           VITE_SERVER_URL: ${{ vars.VITE_SERVER_URL || '' }}
-
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { SEARCH_STAGES, interestById } from "../data";
 import { pickStranger, queueCandidates, searchDuration } from "../engine";
 import { LIVE_ENABLED } from "../config";
-import { getLiveSocket, liveSocket } from "../live";
+import { getLiveSocket, syncLiveProfile } from "../live";
 import { useStore } from "../store";
 import type { LiveMatch, MatchResult } from "../types";
 import { Avatar, Icon } from "../components/ui";
@@ -11,18 +11,15 @@ import { Avatar, Icon } from "../components/ui";
 export function Searching() {
   const { profile, prefs, blocked, setFlow, bumpStats, toast } = useStore();
   const [stageIdx, setStageIdx] = useState(0);
-  const startedRef = useRef(false);
 
   const candidates = useMemo(
-    () => (profile ? queueCandidates(profile, prefs, blocked.map((b) => b.personaId), 6) : []),
+    () => (!LIVE_ENABLED && profile ? queueCandidates(profile, prefs, blocked.map((b) => b.personaId), 6) : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
 
   useEffect(() => {
-    if (startedRef.current || !profile) return;
-    startedRef.current = true;
-    bumpStats({ chats: 1 });
+    if (!profile) return;
 
     const stageTimer = window.setInterval(() => {
       setStageIdx((i) => Math.min(i + 1, SEARCH_STAGES.length - 1));
@@ -31,8 +28,15 @@ export function Searching() {
     /* live mode — join the server queue; a real match arrives over the socket */
     if (LIVE_ENABLED) {
       let cancelled = false;
+      let joined = false;
+      let found = false;
+      let current: Awaited<ReturnType<typeof getLiveSocket>> | null = null;
       const onFound = (m: LiveMatch) => {
-        if (!cancelled) setFlow({ stage: "chat", live: m });
+        if (!cancelled && !found) {
+          found = true;
+          bumpStats({ chats: 1 });
+          setFlow({ stage: "chat", live: m });
+        }
       };
       const onError = (e: { message?: string }) => {
         if (!cancelled) {
@@ -40,27 +44,42 @@ export function Searching() {
           setFlow({ stage: "idle" });
         }
       };
-      void getLiveSocket()
+      const join = () => {
+        if (!cancelled && !found && current?.connected) {
+          joined = true;
+          current.emit("queue:join", { prefs });
+        }
+      };
+      const onDisconnect = () => { joined = false; };
+      const onConnectError = (e: Error) => onError({ message: e.message });
+      void syncLiveProfile(profile, prefs).then(() => cancelled ? null : getLiveSocket())
         .then((s) => {
-          if (cancelled) return;
+          if (cancelled || !s) return;
+          current = s;
           s.on("match:found", onFound);
           s.on("queue:error", onError);
-          s.emit("queue:join", { prefs });
+          s.on("connect", join);
+          s.on("disconnect", onDisconnect);
+          s.on("connect_error", onConnectError);
+          join();
         })
-        .catch(() => {
+        .catch((error: unknown) => {
           if (!cancelled) {
-            toast("Couldn't reach the live server.", "warn");
+            toast(error instanceof Error ? error.message : "Couldn't reach the live server.", "warn");
             setFlow({ stage: "idle" });
           }
         });
       return () => {
         cancelled = true;
         window.clearInterval(stageTimer);
-        const s = liveSocket();
+        const s = current;
         if (s) {
           s.off("match:found", onFound);
           s.off("queue:error", onError);
-          s.emit("queue:leave");
+          s.off("connect", join);
+          s.off("disconnect", onDisconnect);
+          s.off("connect_error", onConnectError);
+          if (joined && !found && s.connected) s.emit("queue:leave");
         }
       };
     }
@@ -73,6 +92,7 @@ export function Searching() {
         setFlow({ stage: "idle" });
         return;
       }
+      bumpStats({ chats: 1 });
       setFlow({ stage: "intro", match });
     }, searchDuration());
 
@@ -123,7 +143,7 @@ export function Searching() {
           Finding someone<span className="animate-caret text-coral">…</span>
         </p>
         <p key={stageIdx} className="mono-label text-fern">{SEARCH_STAGES[stageIdx]}</p>
-        <p className="text-sm font-semibold text-moss mt-3">Usually takes 2–5 seconds when the queue is warm.</p>
+        <p className="text-sm font-semibold text-moss mt-3">{LIVE_ENABLED ? "Waiting for another person. Preferences broaden as you wait." : "Usually takes 2–5 seconds when the queue is warm."}</p>
 
         <button
           className="btn mt-9"

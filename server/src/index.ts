@@ -42,7 +42,7 @@ if (STATIC_DIR) {
 
 await app.ready();
 
-const { statsTimer } = attachSockets(app.server);
+const { io, statsTimer } = attachSockets(app.server);
 
 await app.listen({ port: PORT, host: HOST });
 app.log.info(`StrangrLoop server on :${PORT} — auth: ${AUTH_MODE}, origins: ${ALLOW_ALL_ORIGINS ? "*" : CLIENT_ORIGINS.join(", ")}${STATIC_DIR ? `, static: ${STATIC_DIR}` : ""}`);
@@ -54,6 +54,7 @@ async function shutdown(signal: string): Promise<void> {
   closing = true;
   app.log.info(`${signal} received — shutting down…`);
   stopStatsLoop(statsTimer);
+  await new Promise<void>((resolve) => io.close(() => resolve()));
   try {
     await app.close();
   } finally {

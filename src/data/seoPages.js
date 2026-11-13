@@ -1,4 +1,6 @@
-const SITE_URL = "https://strangerloop.online";
+import { targets } from "./seoTargets.js";
+
+const SITE_URL = (process.env.SEO_SITE_URL || "https://strangerloop.online").trim().replace(/\/+$/, "");
 
 const core = [
   ["random-chat", "Random Chat Online With People Who Share Your Interests", "A broad entry point for people looking for a fresh text conversation without choosing a specific topic first.", "finding a comfortable first conversation"],
@@ -269,52 +271,43 @@ function makeFaq(seed) {
 }
 
 function makePage(seed) {
-  const path = `/${seed.slug.replace(/^\/+|\/+$/g, "")}/`;
-  const title = `${seed.h1}${seed.category === "blog" ? " - Guide" : ""} | StrangerLoop`;
+  const target = targets[seed.slug];
+  const path = seed.slug ? `/${seed.slug}/` : "/";
   return {
     ...seed,
     path,
-    title,
-    metaDescription: seed.intro,
-    intro: seed.intro,
-    sections: makeSections(seed),
-    faq: makeFaq(seed),
-    keywords: [seed.h1.toLowerCase(), seed.angle, "StrangerLoop"],
+    h1: target?.h1 ?? seed.h1,
+    title: `${target?.title ?? `${seed.h1}${seed.category === "blog" ? " - Guide" : ""}`} | StrangrLoop`,
+    metaDescription: target?.description ?? seed.intro,
+    intro: target?.intro ?? seed.intro,
+    sections: target?.sections.map(([heading, body]) => ({ heading, body })) ?? makeSections(seed),
+    faq: target?.faq.map(([q, a]) => ({ q, a })) ?? makeFaq(seed),
+    sources: target?.sources ?? [],
+    related: target?.related ?? [],
     canonical: `${SITE_URL}${path}`,
     schemaType: seed.category === "blog" ? "Article" : "WebPage",
     indexable: true
   };
 }
 
+const redirects = Object.entries(targets).flatMap(([slug, target]) =>
+  (target.aliases ?? []).map((alias) => ({ from: `/${alias}/`, to: slug ? `/${slug}/` : "/" }))
+);
+const redirectByPath = new Map(redirects.map(({ from, to }) => [from, to]));
 const pageSeeds = [...core, ...text, ...anonymous, ...friendship, ...interestBased, ...interests, ...languages, ...guides, ...questions, ...comparisons, ...india, ...articleSeeds, ...hubs];
-const pages = Array.from(new Map(pageSeeds.map((seed) => [seed.slug, makePage(seed)])).values());
+const seedBySlug = new Map(pageSeeds.map((seed) => [seed.slug, seed]));
+for (const [slug, target] of Object.entries(targets)) {
+  if (slug && !seedBySlug.has(slug)) {
+    seedBySlug.set(slug, { slug, category: target.category, parent: target.parent });
+  }
+}
+const pages = [...seedBySlug.values()]
+  .filter((seed) => !redirectByPath.has(`/${seed.slug}/`))
+  .map((seed) => {
+    const parent = redirectByPath.get(seed.parent) ?? seed.parent;
+    return makePage({ ...seed, parent: parent === `/${seed.slug}/` ? "/" : parent });
+  });
+const home = makePage({ slug: "", category: "home", parent: null });
 
-const home = {
-  slug: "",
-  path: "/",
-  title: "Random Chat With Strangers Online | StrangerLoop",
-  h1: "Random chats. Real connections.",
-  metaDescription: "Meet new people through interest-based text chat. StrangerLoop helps adults start respectful conversations with strangers online.",
-  intro: "StrangerLoop is a text-first way to meet people who share your interests. Start a conversation, choose what to share, and leave whenever the chat is not right for you.",
-  category: "home",
-  parent: null,
-  angle: "a clear path from a random hello to a better conversation",
-  sections: [
-    { heading: "Meet someone outside your usual circle", body: "A new conversation can be short, funny, practical, or unexpectedly thoughtful. StrangerLoop uses interests and conversation preferences to give the first message a little more context." },
-    { heading: "Text first, with room to think", body: "Written conversation lets you choose your pace. Ask about a shared interest, answer when you are ready, and keep personal details private while trust develops." },
-    { heading: "Controls for a respectful experience", body: "StrangerLoop is for adults 18 and over. Use next, block, and report controls when a conversation is not a fit, and treat the other person\'s boundaries as seriously as your own." }
-  ],
-  faq: [
-    { q: "What is StrangerLoop?", a: "StrangerLoop is an interest-based, text-first service for adults who want to meet new people and start respectful conversations online." },
-    { q: "Is StrangerLoop a dating app?", a: "No. StrangerLoop is designed for conversation and discovery, not romantic matching or a promise of dating outcomes." },
-    { q: "Can I chat anonymously?", a: "You can use a display name and avoid sharing identifying details, but the service still has accounts, moderation, and operational records. It is not a promise of complete anonymity." },
-    { q: "Is StrangerLoop free?", a: "The current experience is available as a free text-chat experience. Availability and features can change as the product develops." }
-  ],
-  keywords: ["random chat", "chat with strangers", "interest based chat", "online friendship"],
-  canonical: `${SITE_URL}/`,
-  schemaType: "WebSite",
-  indexable: true
-};
-
-export { SITE_URL, home, pages };
+export { SITE_URL, home, pages, redirects };
 export default pages;

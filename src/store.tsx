@@ -123,7 +123,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const toastId = useRef(0);
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [authReady, setAuthReady] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
+  const [hydratedUserId, setHydratedUserId] = useState<string | null | undefined>(undefined);
+  const hydrated = authReady && hydratedUserId === (authUser?.id ?? null);
 
   // subscribe to the auth layer (Supabase or demo) exactly once
   useEffect(() => {
@@ -161,7 +162,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setSettingsState(data.settings);
     setFlow({ stage: "idle" });
     setView("home");
-    setHydrated(true);
+    setHydratedUserId(authUser?.id ?? null);
   }, [authReady, authUser?.id]);
 
   const signOut = useCallback(async () => {
@@ -213,7 +214,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setFlow,
       saveProfile: setProfile,
       setPrefs: setPrefsState,
-      addConnection: (c) => setConnections((prev) => (prev.some((x) => x.id === c.id) ? prev : [c, ...prev])),
+      addConnection: (c) => setConnections((prev) => {
+        const existing = prev.find((x) => x.personaId === c.personaId);
+        return [{ ...c, shared: c.shared.length ? c.shared : existing?.shared ?? [] }, ...prev.filter((x) => x.id !== c.id && x.personaId !== c.personaId)];
+      }),
       removeConnection: (id) => setConnections((prev) => prev.filter((x) => x.id !== id)),
       blockUser: (b) => setBlocked((prev) => (prev.some((x) => x.personaId === b.personaId) ? prev : [b, ...prev])),
       unblockUser: (pid) => setBlocked((prev) => prev.filter((x) => x.personaId !== pid)),
